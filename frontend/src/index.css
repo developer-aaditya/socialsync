@@ -1,0 +1,80 @@
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  --bg-primary: #0b0f19;
+  --bg-card: rgba(15, 23, 42, 0.75);
+  --bg-card-subtle: rgba(30, 41, 59, 0.5);
+  --bg-input: rgba(15, 23, 42, 0.6);
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --comment-bg: rgba(30, 41, 59, 0.4);
+  --comment-border: rgba(255, 255, 255, 0.08);
+  --comment-author: #818cf8;
+  --comment-text: #e2e8f0;
+
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f1f5f9;
+  --bg-input: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --comment-bg: #f8fafc;
+  --comment-border: #e2e8f0;
+  --comment-author: #4338ca;
+  --comment-text: #1e293b;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0b0f19;
+  --bg-card: rgba(15, 23, 42, 0.75);
+  --bg-card-subtle: rgba(30, 41, 59, 0.5);
+  --bg-input: rgba(15, 23, 42, 0.6);
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --comment-bg: rgba(30, 41, 59, 0.4);
+  --comment-border: rgba(255, 255, 255, 0.08);
+  --comment-author: #818cf8;
+  --comment-text: #e2e8f0;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+}
