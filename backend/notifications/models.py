@@ -9,6 +9,10 @@ class Notification(models.Model):
         ('dislike', 'Post Dislike'),
         ('comment', 'Post Comment'),
         ('reply', 'Comment Reply'),
+        ('follow', 'Follow'),
+        ('unfollow', 'Unfollow'),
+        ('follow_back', 'Follow Back'),
+        ('mention', 'User Mention'),
     )
     
     receipient = models.ForeignKey(
@@ -34,5 +38,5 @@ class Notification(models.Model):
     
     
     def __str__(self):
-        return f"Notification for {self.receipient.email} - Type: {self.notification_type}d"
+        return f"Notification for @{self.receipient.email} - Type: {self.notification_type}d"
     

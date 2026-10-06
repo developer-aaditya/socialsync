@@ -18,6 +18,7 @@ class PostsAndCommentsAPITests(APITestCase):
 
         self.user1 = User.objects.create_user(
             email='user1@example.com',
+            username='user1',
             password='Password123!',
             full_name='User One',
             date_of_birth='1990-01-01',
@@ -26,6 +27,7 @@ class PostsAndCommentsAPITests(APITestCase):
 
         self.user2 = User.objects.create_user(
             email='user2@example.com',
+            username='user2',
             password='Password123!',
             full_name='User Two',
             date_of_birth='1992-02-02',

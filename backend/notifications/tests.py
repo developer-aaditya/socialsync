@@ -18,6 +18,7 @@ class NotificationsAPITests(APITestCase):
 
         self.user1 = User.objects.create_user(
             email='author@example.com',
+            username='author_user',
             password='Password123!',
             full_name='Author User',
             date_of_birth='1990-01-01'
@@ -25,6 +26,7 @@ class NotificationsAPITests(APITestCase):
 
         self.user2 = User.objects.create_user(
             email='interactor@example.com',
+            username='interactor_user',
             password='Password123!',
             full_name='Interactor User',
             date_of_birth='1992-02-02'
@@ -112,3 +114,28 @@ class NotificationsAPITests(APITestCase):
 
         unread_count = Notification.objects.filter(receipient=self.user1, read_status=False).count()
         self.assertEqual(unread_count, 0)
+
+    def test_post_and_comment_mention_notifications(self):
+        # User 1 posts with @interactor_user mention
+        post = Post.objects.create(
+            user=self.user1,
+            description='Hey @interactor_user check out this awesome post!',
+            image=self.dummy_image
+        )
+
+        # Check User 2 got mention notification
+        mention_notif = Notification.objects.filter(receipient=self.user2, notification_type='mention', post=post).first()
+        self.assertIsNotNone(mention_notif)
+        self.assertEqual(mention_notif.actor, self.user1)
+
+        # User 2 comments mentioning @author_user
+        comment = Comment.objects.create(
+            user=self.user2,
+            post=post,
+            text='Shoutout to @author_user for creating this!'
+        )
+
+        # Check User 1 got comment mention notification
+        comm_mention_notif = Notification.objects.filter(receipient=self.user1, notification_type='mention', comment=comment).first()
+        self.assertIsNotNone(comm_mention_notif)
+        self.assertEqual(comm_mention_notif.actor, self.user2)

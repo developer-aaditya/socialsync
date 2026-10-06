@@ -5,7 +5,8 @@ from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
-from .models import User
+from .models import User, Follow
+from notifications.models import Notification
 
 
 class UserAuthenticationTests(APITestCase):
@@ -14,6 +15,7 @@ class UserAuthenticationTests(APITestCase):
         self.signup_url = reverse('signup')
         self.login_url = reverse('login')
         self.profile_url = reverse('profile')
+        self.username_check_url = reverse('check_username_availability')
 
         # Dummy image for signup/profile tests
         self.dummy_image = SimpleUploadedFile(
@@ -25,7 +27,9 @@ class UserAuthenticationTests(APITestCase):
     def test_signup_success(self):
         data = {
             'email': 'newuser@example.com',
+            'username': 'newuser',
             'full_name': 'New User',
+            'description': 'Hello world bio!',
             'date_of_birth': '2000-01-01',
             'password': 'Password123!',
             'confirm_password': 'Password123!',
@@ -39,6 +43,7 @@ class UserAuthenticationTests(APITestCase):
     def test_signup_under_18_fails(self):
         data = {
             'email': 'underage@example.com',
+            'username': 'underage',
             'full_name': 'Under Age',
             'date_of_birth': f"{date.today().year - 15}-01-01",
             'password': 'Password123!',
@@ -52,6 +57,7 @@ class UserAuthenticationTests(APITestCase):
     def test_login_success(self):
         User.objects.create_user(
             email='testlogin@example.com',
+            username='testlogin',
             password='Password123!',
             full_name='Test Login',
             date_of_birth='1995-05-05',
@@ -68,8 +74,10 @@ class UserAuthenticationTests(APITestCase):
     def test_profile_retrieval_and_update(self):
         user = User.objects.create_user(
             email='profileuser@example.com',
+            username='profileuser',
             password='Password123!',
             full_name='Profile User',
+            description='Original bio',
             date_of_birth='1998-08-08',
             profile_picture=self.dummy_image
         )
@@ -79,9 +87,101 @@ class UserAuthenticationTests(APITestCase):
         get_res = self.client.get(self.profile_url)
         self.assertEqual(get_res.status_code, status.HTTP_200_OK)
         self.assertEqual(get_res.data['full_name'], 'Profile User')
+        self.assertEqual(get_res.data['username'], 'profileuser')
 
         # PATCH Profile
-        patch_res = self.client.patch(self.profile_url, {'college': 'Harvard University', 'full_name': 'Profile User Updated'})
+        patch_res = self.client.patch(self.profile_url, {
+            'college': 'Harvard University', 
+            'full_name': 'Profile User Updated',
+            'description': 'Updated bio text'
+        })
         self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
         self.assertEqual(patch_res.data['user']['college'], 'Harvard University')
-        self.assertEqual(patch_res.data['user']['full_name'], 'Profile User Updated')
+        self.assertEqual(patch_res.data['user']['description'], 'Updated bio text')
+
+    def test_username_availability_check(self):
+        User.objects.create_user(
+            email='existing@example.com',
+            username='john_doe',
+            password='Password123!',
+            full_name='John Doe',
+            date_of_birth='1995-05-05',
+            profile_picture=self.dummy_image
+        )
+
+        # Check taken username
+        res1 = self.client.get(f"{self.username_check_url}?username=john_doe")
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertFalse(res1.data['available'])
+
+        # Check available username
+        res2 = self.client.get(f"{self.username_check_url}?username=jane_doe")
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertTrue(res2.data['available'])
+
+    def test_public_profile_and_follow_flow(self):
+        user1 = User.objects.create_user(
+            email='user1@example.com',
+            username='user1',
+            password='Password123!',
+            full_name='User One',
+            description='Bio for User 1',
+            date_of_birth='1995-01-01',
+            profile_picture=self.dummy_image
+        )
+        user2 = User.objects.create_user(
+            email='user2@example.com',
+            username='user2',
+            password='Password123!',
+            full_name='User Two',
+            description='Bio for User 2',
+            date_of_birth='1996-02-02',
+            profile_picture=self.dummy_image
+        )
+
+        public_profile_url = reverse('public_profile', kwargs={'username': 'user2'})
+        follow_url = reverse('toggle_follow', kwargs={'username': 'user2'})
+
+        # Authenticate as user1
+        self.client.force_authenticate(user=user1)
+
+        # 1. View user2's public profile before following
+        res = self.client.get(public_profile_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['user']['username'], 'user2')
+        self.assertFalse(res.data['user']['is_following'])
+
+        # 2. User 1 follows User 2
+        follow_res = self.client.post(follow_url)
+        self.assertEqual(follow_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(follow_res.data['is_following'])
+
+        # Check notification for user2
+        notification = Notification.objects.get(receipient=user2, actor=user1)
+        self.assertEqual(notification.notification_type, 'follow')
+
+        # 3. User 2 follows back User 1 (reciprocal follow)
+        self.client.force_authenticate(user=user2)
+        follow_back_url = reverse('toggle_follow', kwargs={'username': 'user1'})
+        follow_back_res = self.client.post(follow_back_url)
+        self.assertEqual(follow_back_res.status_code, status.HTTP_200_OK)
+
+        # Check follow_back notification for user1
+        fb_notification = Notification.objects.get(receipient=user1, actor=user2)
+        self.assertEqual(fb_notification.notification_type, 'follow_back')
+
+    def test_user_search_api(self):
+        User.objects.create_user(
+            email='alex@example.com',
+            username='alex_coder',
+            password='Password123!',
+            full_name='Alex Rivera',
+            date_of_birth='1995-05-05',
+            profile_picture=self.dummy_image
+        )
+
+        search_url = reverse('search_users')
+        res = self.client.get(f"{search_url}?q=alex")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]['username'], 'alex_coder')

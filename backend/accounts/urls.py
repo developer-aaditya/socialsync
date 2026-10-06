@@ -10,4 +10,10 @@ urlpatterns = [
     
     # User profile endpoints
     path('profile/', views.profile_view, name='profile'),
+    
+    # Username availability check & social profile endpoints
+    path('username-check/', views.check_username_availability, name='check_username_availability'),
+    path('profile/user/<str:username>/', views.get_user_profile_by_username, name='public_profile'),
+    path('profile/user/<str:username>/follow/', views.toggle_follow, name='toggle_follow'),
+    path('search/', views.search_users, name='search_users'),
 ]

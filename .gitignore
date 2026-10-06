@@ -15,6 +15,11 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
+# Test Scripts & Results
+**/tests.py
+**/test_*.py
+**/tests/
+
 # Environment Variables & Secrets
 .env
 *.env

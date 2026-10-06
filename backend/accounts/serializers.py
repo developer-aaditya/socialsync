@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from .models import User
+from posts.serializers import PostSerializer
 
 # Serializer for user signup
 class UserSignupSerializer(serializers.ModelSerializer):
@@ -20,12 +21,20 @@ class UserSignupSerializer(serializers.ModelSerializer):
     # This serializer works with custom User model
     class Meta:
         model = User
-        fields = ['email', 'full_name', 'date_of_birth', 'profile_picture', 
-                 'password', 'confirm_password']
+        fields = ['email', 'username', 'full_name', 'description', 'date_of_birth',
+                'profile_picture', 'password', 'confirm_password']
         extra_kwargs = {
             'email': {'required': True},
+            'username': {'required': True},
             'full_name': {'required': True},
         }
+    
+    def validate_username(self, value):
+        # Ensure username is lowercase and stripped of whitespace
+        username = value.lower().strip()
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return username
     
     # Matches the password and confirm_password fields
     def validate(self, data):
@@ -91,13 +100,33 @@ class UserLoginSerializer(serializers.Serializer):
 # Serializer for user profile
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    followers_count = serializers.SerializerMethodField()
+    following_count = serializers.SerializerMethodField()
+    my_posts = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['email', 'full_name', 'date_of_birth', 'profile_picture', 'date_joined', 'college']
+        fields = ['email', 'username', 'full_name', 'date_of_birth', 'profile_picture',
+                'date_joined', 'college', 'description', 'followers_count', 'following_count', 'my_posts']
         extra_kwargs = {
             'date_joined': {'read_only': True},
         }
+    
+    def get_followers_count(self, obj):
+        return obj.followers.count()
+    
+    def get_following_count(self, obj):
+        return obj.following.count()
+    
+    def get_my_posts(self, obj):
+        # Get the request user from context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            # Filter posts by the authenticated user
+            posts = obj.posts.filter(author=request.user)
+            return PostSerializer(posts, many=True).data
+        return []
     
     # Validate profile picture
     def validate_profile_picture(self, value):
@@ -108,3 +137,39 @@ class UserProfileSerializer(serializers.ModelSerializer):
             if value.content_type not in allowed_types:
                 raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
         return value
+    
+
+class PublicUserProfileSerializer(serializers.ModelSerializer):
+    followers_count = serializers.SerializerMethodField()
+    following_count = serializers.SerializerMethodField()  
+    is_following = serializers.SerializerMethodField()
+    is_following_back = serializers.SerializerMethodField()
+    user_posts = serializers.SerializerMethodField()  
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'full_name', 'description', 'college',
+                'profile_picture', 'followers_count', 'following_count',
+                'is_following', 'is_following_back', 'user_posts']
+    
+    def get_followers_count(self, obj):
+        return obj.followers.count()
+    
+    def get_following_count(self, obj):
+        return obj.following.count()
+    
+    def get_is_following(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and hasattr(request, 'user'):
+            return obj.followers.filter(id=request.user.id).exists()
+        return False
+    
+    def get_is_following_back(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and hasattr(request, 'user'):
+            return obj.following.filter(id=request.user.id).exists()
+        return False
+
+    def get_user_posts(self, obj):
+        posts = obj.posts.all()
+        return PostSerializer(posts, many=True).data
