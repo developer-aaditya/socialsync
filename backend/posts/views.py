@@ -5,9 +5,10 @@ from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from .models import Post, PostInteraction, Comment, CommentInteraction
+from .models import Post, PostInteraction, Comment, CommentInteraction, Story, StoryView
 from .serializers import (
-    PostSerializer, PostCreateSerializer, CommentSerializer, CommentCreateSerializer
+    PostSerializer, PostCreateSerializer, CommentSerializer, CommentCreateSerializer,
+    StorySerializer, StoryCreateSerializer, StoryViewerSerializer
 )
 from rest_framework.throttling import ScopedRateThrottle
 from django.db.models import F, Count, Case, When, Value, IntegerField, ExpressionWrapper
@@ -342,3 +343,66 @@ def dislike_comment_view(request, comment_id):
             )
             message = 'Comment disliked'
     return Response({'message': message}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def stories_view(request):
+    """
+    GET: List active non-expired 24-hour stories.
+    POST: Upload a new 24-hour story.
+    """
+    if request.method == 'GET':
+        active_stories = Story.active.all().order_by('-created_at')
+        serializer = StorySerializer(active_stories, many=True, context={'request': request})
+        return Response({
+            'count': active_stories.count(),
+            'stories': serializer.data
+        }, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        serializer = StoryCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            story = serializer.save(user=request.user)
+            res_serializer = StorySerializer(story, context={'request': request})
+            return Response({
+                'message': 'Story published successfully (expires in 24 hours)',
+                'story': res_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_story_viewed_view(request, story_id):
+    """
+    Mark a story as viewed by the authenticated user.
+    """
+    story = get_object_or_404(Story, id=story_id)
+    if story.is_expired():
+        return Response({'error': 'This story has expired.'}, status=status.HTTP_410_GONE)
+
+    view_obj, created = StoryView.objects.get_or_create(story=story, viewer=request.user)
+    return Response({
+        'message': 'Story marked as viewed',
+        'already_viewed': not created,
+        'views_count': story.views.count()
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_story_viewers_view(request, story_id):
+    """
+    Get the list of viewers for a story (Only accessible by story owner).
+    """
+    story = get_object_or_404(Story, id=story_id)
+    if story.user != request.user:
+        return Response({'error': 'You can only view viewer lists for your own stories.'}, status=status.HTTP_403_FORBIDDEN)
+
+    views = story.views.all()
+    serializer = StoryViewerSerializer(views, many=True, context={'request': request})
+    return Response({
+        'count': views.count(),
+        'viewers': serializer.data
+    }, status=status.HTTP_200_OK)

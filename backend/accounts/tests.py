@@ -171,7 +171,7 @@ class UserAuthenticationTests(APITestCase):
         self.assertEqual(fb_notification.notification_type, 'follow_back')
 
     def test_user_search_api(self):
-        User.objects.create_user(
+        user = User.objects.create_user(
             email='alex@example.com',
             username='alex_coder',
             password='Password123!',
@@ -179,6 +179,7 @@ class UserAuthenticationTests(APITestCase):
             date_of_birth='1995-05-05',
             profile_picture=self.dummy_image
         )
+        self.client.force_authenticate(user=user)
 
         search_url = reverse('search_users')
         res = self.client.get(f"{search_url}?q=alex")

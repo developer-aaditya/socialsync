@@ -2,8 +2,10 @@ from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
+from datetime import timedelta
+from django.utils import timezone
 from accounts.models import User
-from .models import Post, PostInteraction, Comment, CommentInteraction
+from .models import Post, PostInteraction, Comment, CommentInteraction, Story, StoryView
 
 
 class PostsAndCommentsAPITests(APITestCase):
@@ -149,3 +151,46 @@ class PostsAndCommentsAPITests(APITestCase):
         like_comm_url = reverse('like_comment', kwargs={'comment_id': parent_comment_id})
         res_like_c = self.client.post(like_comm_url)
         self.assertEqual(res_like_c.status_code, status.HTTP_200_OK)
+
+    def test_ephemeral_stories_workflow(self):
+        stories_url = reverse('stories')
+
+        # 1. User1 posts a story
+        self.client.force_authenticate(user=self.user1)
+        res_create = self.client.post(stories_url, {
+            'image': self.dummy_image,
+            'caption': 'My 24h story!'
+        }, format='multipart')
+        self.assertEqual(res_create.status_code, status.HTTP_201_CREATED)
+        story_id = res_create.data['story']['id']
+
+        # 2. User2 views active stories list
+        self.client.force_authenticate(user=self.user2)
+        res_list = self.client.get(stories_url)
+        self.assertEqual(res_list.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_list.data['count'], 1)
+
+        # 3. User2 marks User1's story as viewed
+        view_url = reverse('mark_story_viewed', kwargs={'story_id': story_id})
+        res_view = self.client.post(view_url)
+        self.assertEqual(res_view.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_view.data['already_viewed'] == False)
+
+        # 4. User1 checks who viewed their story
+        self.client.force_authenticate(user=self.user1)
+        viewers_url = reverse('get_story_viewers', kwargs={'story_id': story_id})
+        res_viewers = self.client.get(viewers_url)
+        self.assertEqual(res_viewers.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_viewers.data['count'], 1)
+        self.assertEqual(res_viewers.data['viewers'][0]['username'], 'user2')
+
+        # 5. Create an expired story (>24h ago) and verify it is auto-excluded
+        expired_story = Story.objects.create(
+            user=self.user1,
+            image=self.dummy_image,
+            caption='Old story',
+            expires_at=timezone.now() - timedelta(hours=2)
+        )
+        res_list_after = self.client.get(stories_url)
+        # Should still be count=1 (expired story excluded)
+        self.assertEqual(res_list_after.data['count'], 1)

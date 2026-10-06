@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
+from datetime import timedelta
+from django.utils import timezone
 
 
 class Post(models.Model):
@@ -162,3 +164,69 @@ class CommentInteraction(models.Model):
     def __str__(self):
         # String representation of the interaction.
         return f"{self.user.email} {self.interaction_type}d comment {self.comment.id}"
+
+
+class ActiveStoryManager(models.Manager):
+    """
+    Manager that automatically filters out expired stories (>24h old).
+    """
+    def get_queryset(self):
+        return super().get_queryset().filter(expires_at__gt=timezone.now())
+
+
+class Story(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='stories'
+    )
+    image = models.ImageField(
+        upload_to='story_images/',
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png'])]
+    )
+    caption = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    objects = models.Manager()
+    active = ActiveStoryManager()
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Story'
+        verbose_name_plural = 'Stories'
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            # Set default 24-hour expiration window
+            self.expires_at = timezone.now() + timedelta(hours=24)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        return f"Story by @{self.user.username} (Expires: {self.expires_at})"
+
+
+class StoryView(models.Model):
+    story = models.ForeignKey(
+        Story,
+        on_delete=models.CASCADE,
+        related_name='views'
+    )
+    viewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='story_views'
+    )
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('story', 'viewer')
+        ordering = ['-viewed_at']
+        verbose_name = 'Story View'
+        verbose_name_plural = 'Story Views'
+
+    def __str__(self):
+        return f"@{self.viewer.username} viewed story {self.story.id}"

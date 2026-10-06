@@ -100,44 +100,91 @@ class UserLoginSerializer(serializers.Serializer):
 # Serializer for user profile
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(read_only=True)
-    username = serializers.CharField(read_only=True)
+    username = serializers.CharField(required=False)
+    full_name = serializers.CharField(required=False)
+    date_of_birth = serializers.DateField(required=False)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    bio = serializers.CharField(source='description', required=False, allow_blank=True, allow_null=True)
+    college = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
     my_posts = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = User
-        fields = ['email', 'username', 'full_name', 'date_of_birth', 'profile_picture',
-                'date_joined', 'college', 'description', 'followers_count', 'following_count', 'my_posts']
-        extra_kwargs = {
-            'date_joined': {'read_only': True},
-        }
-    
+        fields = [
+            'id', 'email', 'username', 'full_name', 'date_of_birth', 
+            'profile_picture', 'date_joined', 'college', 'description', 'bio',
+            'followers_count', 'following_count', 'my_posts'
+        ]
+        read_only_fields = ['id', 'email', 'date_joined']
+
+    def to_internal_value(self, data):
+        # Handle string URLs or empty values gracefully for file and date fields
+        if hasattr(data, 'copy'):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        # Allow 'bio' key from frontend to set 'description'
+        if 'bio' in data and 'description' not in data:
+            data['description'] = data['bio']
+
+        if 'profile_picture' in data:
+            val = data['profile_picture']
+            if isinstance(val, str) or val is None or val == 'null' or val == '':
+                data.pop('profile_picture', None)
+
+        if 'date_of_birth' in data:
+            val = data['date_of_birth']
+            if not val or val == 'null' or val == '':
+                if self.instance and self.instance.date_of_birth:
+                    data.pop('date_of_birth', None)
+
+        return super().to_internal_value(data)
+
+    def validate_date_of_birth(self, value):
+        if not value:
+            if self.instance and self.instance.date_of_birth:
+                return self.instance.date_of_birth
+            raise serializers.ValidationError("Date of birth is mandatory. Please enter your date of birth.")
+
+        today = date.today()
+        age = relativedelta(today, value).years
+        if age < 18:
+            raise serializers.ValidationError("You must be at least 18 years old.")
+        return value
+
+    def validate_username(self, value):
+        if value:
+            username = value.lower().strip()
+            if User.objects.exclude(pk=self.instance.pk).filter(username__iexact=username).exists():
+                raise serializers.ValidationError("This username is already taken.")
+            return username
+        return value
+
     def get_followers_count(self, obj):
         return obj.followers.count()
-    
+
     def get_following_count(self, obj):
         return obj.following.count()
-    
+
     def get_my_posts(self, obj):
-        # Get the request user from context
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            # Filter posts by the authenticated user
-            posts = obj.posts.filter(author=request.user)
-            return PostSerializer(posts, many=True).data
-        return []
-    
-    # Validate profile picture
+        posts = obj.posts.all().order_by('-created_at')
+        return PostSerializer(posts, many=True, context={'request': request}).data
+
     def validate_profile_picture(self, value):
-        if value:
-            if value.size > 5 * 1024 * 1024:
+        if value and not isinstance(value, str):
+            if hasattr(value, 'size') and value.size > 5 * 1024 * 1024:
                 raise serializers.ValidationError("Image file too large. Maximum size is 5MB.")
-            allowed_types = ['image/jpeg', 'image/jpg', 'image/png']
-            if value.content_type not in allowed_types:
-                raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
+            if hasattr(value, 'content_type'):
+                allowed_types = ['image/jpeg', 'image/jpg', 'image/png']
+                if value.content_type not in allowed_types:
+                    raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
         return value
-    
+
 
 class PublicUserProfileSerializer(serializers.ModelSerializer):
     followers_count = serializers.SerializerMethodField()
@@ -145,10 +192,11 @@ class PublicUserProfileSerializer(serializers.ModelSerializer):
     is_following = serializers.SerializerMethodField()
     is_following_back = serializers.SerializerMethodField()
     user_posts = serializers.SerializerMethodField()  
+    bio = serializers.CharField(source='description', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'description', 'college',
+        fields = ['id', 'username', 'full_name', 'description', 'bio', 'college',
                 'profile_picture', 'followers_count', 'following_count',
                 'is_following', 'is_following_back', 'user_posts']
     

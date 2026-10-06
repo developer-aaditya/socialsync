@@ -30,6 +30,7 @@ ALLOWED_HOSTS = [
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -37,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'channels',     # Django Channels for WebSocket support
     
     # drf apps
     'rest_framework',
@@ -77,7 +79,24 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'social_media.wsgi.application'
+# ASGI application for Django Channels (WebSocket support)
+ASGI_APPLICATION = 'social_media.asgi.application'
+
+# # Channels layer configuration using Redis as the backing store
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [("127.0.0.1", 6379)]
+#         }
+#     }
+# }
+# For development, we can use the in-memory channel layer instead of Redis.
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',  # Use in-memory layer for development
+    },
+}
 
 # PostgreSQL configuration (uncomment to use PostgreSQL)
 DATABASES = {
@@ -159,10 +178,8 @@ REST_FRAMEWORK = {
 
 # JWT (JSON Web Token) configuration
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=10),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    # 'ROTATE_REFRESH_TOKENS': True,
-    # 'BLACKLIST_AFTER_ROTATION': True,
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=10),
 }
 
 # CORS configuration to allow local frontend server

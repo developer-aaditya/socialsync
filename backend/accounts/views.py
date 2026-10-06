@@ -81,29 +81,38 @@ def login_view(request):
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
-    # Get the current authenticated user
     user = request.user
     
     if request.method == 'GET':
-        # Return user profile data
-        serializer = UserProfileSerializer(user)
+        serializer = UserProfileSerializer(user, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PATCH':
-        # Update user profile
-        serializer = UserProfileSerializer(user, data=request.data, partial=True)
+        serializer = UserProfileSerializer(user, data=request.data, partial=True, context={'request': request})
         
         if serializer.is_valid():
-            # Save the updated user
             serializer.save()
-            
             return Response({
                 'message': 'Profile updated successfully',
                 'user': serializer.data
             }, status=status.HTTP_200_OK)
         
-        # Return validation errors if data is invalid
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Extract first error string for top-level frontend alert display
+        first_error_msg = "Failed to update profile due to validation errors."
+        for field, errs in serializer.errors.items():
+            if isinstance(errs, list) and len(errs) > 0:
+                first_error_msg = str(errs[0])
+                break
+            elif isinstance(errs, str):
+                first_error_msg = errs
+                break
+
+        print(f"[Profile Update 400 Validation Error] {serializer.errors}")
+        return Response({
+            'error': first_error_msg,
+            'message': first_error_msg,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     
 @api_view(['GET'])
@@ -258,3 +267,46 @@ def search_users(request):
         })
 
     return Response(results, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_followers(request, username):
+    """
+    Get list of users who follow the target user.
+    """
+    target_user = get_object_or_404(User, username__iexact=username)
+    followers_relations = Follow.objects.filter(following=target_user).select_related('follower')
+    results = []
+    for rel in followers_relations:
+        u = rel.follower
+        avatar_url = request.build_absolute_uri(u.profile_picture.url) if u.profile_picture else None
+        results.append({
+            'id': u.id,
+            'username': u.username,
+            'full_name': u.full_name,
+            'profile_picture': avatar_url,
+        })
+    return Response(results, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_following(request, username):
+    """
+    Get list of users whom the target user is following.
+    """
+    target_user = get_object_or_404(User, username__iexact=username)
+    following_relations = Follow.objects.filter(follower=target_user).select_related('following')
+    results = []
+    for rel in following_relations:
+        u = rel.following
+        avatar_url = request.build_absolute_uri(u.profile_picture.url) if u.profile_picture else None
+        results.append({
+            'id': u.id,
+            'username': u.username,
+            'full_name': u.full_name,
+            'profile_picture': avatar_url,
+        })
+    return Response(results, status=status.HTTP_200_OK)
+
