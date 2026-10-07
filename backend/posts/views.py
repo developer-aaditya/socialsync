@@ -79,14 +79,14 @@ def get_all_posts_view(request):
         
     paginated_posts = paginator.paginate_queryset(posts, request)
     serializer = PostSerializer(paginated_posts, many=True, context={'request': request})
-    response = paginator.get_paginated_response(serializer.data).data
+    response_data = paginator.get_paginated_response(serializer.data).data
 
     # Cache the response for future requests
     cache_set_ttl = getattr(settings, 'CACHE_TTL', 60 * 15)  # Use the cache TTL defined in settings.py
-    cache.set(cache_key, response, timeout=cache_set_ttl)
+    cache.set(cache_key, response_data, timeout=cache_set_ttl)
 
     # Return the DRF paginated response (includes next/previous links and count)
-    return response(response, status=status.HTTP_200_OK)
+    return Response(response_data, status=status.HTTP_200_OK)
     
 
 @api_view(['GET', 'POST'])
