@@ -12,6 +12,8 @@ from posts.models import Post
 from posts.serializers import PostSerializer
 from django.db import transaction
 from django.db.models import Q
+from django.core.cache import cache
+from django.conf import settings
 
 
 class AuthRateThrottle(AnonRateThrottle):
@@ -82,9 +84,16 @@ def login_view(request):
 @permission_classes([IsAuthenticated])
 def profile_view(request):
     user = request.user
+    cache_key = f"user_profile:{user.id}"
     
     if request.method == 'GET':
+        cached_profile = cache.get(cache_key)
+        if cached_profile:
+            return Response(cached_profile, status=status.HTTP_200_OK)
+
         serializer = UserProfileSerializer(user, context={'request': request})
+        cache_ttl = getattr(settings, 'CACHE_TTL', 15 * 60)  # Default to 15 minutes if not set in settings.py
+        cache.set(cache_key, serializer.data, timeout=cache_ttl)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PATCH':
@@ -92,6 +101,9 @@ def profile_view(request):
         
         if serializer.is_valid():
             serializer.save()
+            # Evict user profile cache on update
+            cache.delete(cache_key)
+            cache.delete_pattern(f"public_profile:target:{user.id}:*")
             return Response({
                 'message': 'Profile updated successfully',
                 'user': serializer.data
@@ -146,6 +158,11 @@ def get_user_profile_by_username(request, username):
     target_user = get_object_or_404(User, username__iexact=username)
     current_user = request.user
 
+    cache_key = f"public_profile:target:{target_user.id}:req:{current_user.id}"
+    cached_profile = cache.get(cache_key)
+    if cached_profile:
+        return Response(cached_profile, status=status.HTTP_200_OK)
+
     followers_count = target_user.followers.count()
     following_count = target_user.following.count()
     
@@ -160,7 +177,7 @@ def get_user_profile_by_username(request, username):
     posts = Post.objects.filter(user=target_user).order_by('-created_at')
     posts_serializer = PostSerializer(posts, many=True, context={'request': request})
     
-    return Response({
+    response_data = {
         'user': {
             'id': target_user.id,
             'username': target_user.username,
@@ -174,7 +191,12 @@ def get_user_profile_by_username(request, username):
             'is_following_back': is_following_back,
         },
         'posts': posts_serializer.data
-    }, status=status.HTTP_200_OK)
+    }
+
+    cache_ttl = getattr(settings, 'CACHE_TTL', 15 * 60)  # Default to 15 minutes if not set in settings.py
+    cache.set(cache_key, response_data, timeout=cache_ttl)
+
+    return Response(response_data, status=status.HTTP_200_OK)
     
     
 @api_view(['POST'])
