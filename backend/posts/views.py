@@ -15,6 +15,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from django.db.models import F, Count, Case, When, Value, IntegerField, ExpressionWrapper
 from django.utils import timezone
 from datetime import timedelta
+from .tasks import compress_and_convert_post_image
 
 
 
@@ -94,6 +95,10 @@ def posts_view(request):
     serializer = PostCreateSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         post = serializer.save()
+        
+        # Trigger the background celery task to compress and convert image asynchronously
+        compress_and_convert_post_image.delay(post.id) 
+        
         response_serializer = PostSerializer(post, context={'request': request})
         return Response(
             {

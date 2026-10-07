@@ -187,3 +187,16 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
 ]
+
+# CELERY and Redis configuration
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Redis as the message broker
+
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # Redis as the result backend
+
+# Accept JSON payloads format for tasks data security
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Store times in UTC format for consistency across different time zones
+CELERY_TIMEZONE = TIME_ZONE
