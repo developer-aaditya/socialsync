@@ -244,17 +244,19 @@ def toggle_follow(request, username):
 def search_users(request):
     """
     Search users by username handle or full name for @mention autocompletion.
+    If query is empty, returns suggested recent users.
     """
     query = request.query_params.get('q', '').strip()
-    if not query:
-        return Response([], status=status.HTTP_200_OK)
 
     if query.startswith('@'):
         query = query[1:]
 
-    users = User.objects.filter(
-        Q(username__icontains=query) | Q(full_name__icontains=query)
-    )[:10]
+    if not query:
+        users = User.objects.all().order_by('-date_joined')[:10]
+    else:
+        users = User.objects.filter(
+            Q(username__icontains=query) | Q(full_name__icontains=query)
+        )[:10]
 
     results = []
     for user in users:

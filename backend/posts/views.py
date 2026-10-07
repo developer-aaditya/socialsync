@@ -10,6 +10,7 @@ from .serializers import (
     PostSerializer, PostCreateSerializer, CommentSerializer, CommentCreateSerializer,
     StorySerializer, StoryCreateSerializer, StoryViewerSerializer
 )
+from notifications.models import Notification
 from rest_framework.throttling import ScopedRateThrottle
 from django.db.models import F, Count, Case, When, Value, IntegerField, ExpressionWrapper
 from django.utils import timezone
@@ -105,12 +106,15 @@ def posts_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['DELETE'])
+@api_view(['GET', 'DELETE'])
 @permission_classes([IsAuthenticated])
-def delete_post_view(request, post_id):
+def single_post_view(request, post_id):
     post = get_object_or_404(Post, id=post_id)
+    if request.method == 'GET':
+        serializer = PostSerializer(post, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
-    # Check if the current user owns this post
+    # DELETE
     if post.user != request.user:
         return Response({
             'error': 'You can only delete your own posts'
@@ -124,16 +128,20 @@ def delete_post_view(request, post_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def like_post_view(request, post_id):
-    post = get_object_or_404(Post, id=post_id)
-    
-    # # Users cannot like their own posts
-    # if post.user == request.user:
-    #     return Response({
-    #         'error': 'You cannot like your own post'
-    #     }, status=status.HTTP_400_BAD_REQUEST)
-    
     # database transaction to ensure data consistency
     with transaction.atomic():
+        post = Post.objects.select_for_update().get(id=post_id)
+        if not post:
+            return Response({
+                'error': 'Post not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # # Users cannot like their own posts
+        # if post.user == request.user:
+        #     return Response({
+        #         'error': 'You cannot like your own post'
+        #     }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Check if user already has an interaction with this post
         try:
             interaction = PostInteraction.objects.get(user=request.user, post=post)
@@ -141,19 +149,24 @@ def like_post_view(request, post_id):
             if interaction.interaction_type == PostInteraction.LIKE:
                 # User already liked this post, so remove the like
                 interaction.delete()
-                post.likes_count -= 1
-                post.save()
+                post.likes_count = max(post.likes_count - 1, 0)  # Ensure likes_count doesn't go negative
                 message = 'Like removed'
                 user_interaction = None
             else:
                 # User disliked this post, change to like
                 interaction.interaction_type = PostInteraction.LIKE
                 interaction.save()
-                post.dislikes_count -= 1
+                post.dislikes_count = max(post.dislikes_count - 1, 0)  # Ensure dislikes_count doesn't go negative
                 post.likes_count += 1
-                post.save()
                 message = 'Post liked'
                 user_interaction = 'like'
+                if post.user != request.user:
+                    Notification.objects.create(
+                        receipient=post.user,
+                        actor=request.user,
+                        notification_type='like',
+                        post=post
+                    )
                 
         except PostInteraction.DoesNotExist:
             # User hasn't interacted with this post yet, create new like
@@ -163,10 +176,19 @@ def like_post_view(request, post_id):
                 interaction_type=PostInteraction.LIKE
             )
             post.likes_count += 1
-            post.save()
             message = 'Post liked'
             user_interaction = 'like'
+            if post.user != request.user:
+                Notification.objects.create(
+                    receipient=post.user,
+                    actor=request.user,
+                    notification_type='like',
+                    post=post
+                )
     
+        # Save the post after updating counts
+        post.save()
+            
     return Response({
         'message': message,
         'likes_count': post.likes_count,
@@ -178,17 +200,16 @@ def like_post_view(request, post_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def dislike_post_view(request, post_id):
-    # Get the post or return 404 if not found
-    post = get_object_or_404(Post, id=post_id)
-    
-    # Users cannot dislike their own posts
-    if post.user == request.user:
-        return Response({
-            'error': 'You cannot dislike your own post'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
     # Use database transaction to ensure data consistency
     with transaction.atomic():
+        post = Post.objects.select_for_update().get(id=post_id)
+        
+        # Users cannot dislike their own posts
+        if post.user == request.user:
+            return Response({
+                'error': 'You cannot dislike your own post'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Check if user already has an interaction with this post
         try:
             interaction = PostInteraction.objects.get(user=request.user, post=post)
@@ -196,17 +217,15 @@ def dislike_post_view(request, post_id):
             if interaction.interaction_type == PostInteraction.DISLIKE:
                 # User already disliked this post, so remove the dislike
                 interaction.delete()
-                post.dislikes_count -= 1
-                post.save()
+                post.dislikes_count = max(post.dislikes_count - 1, 0)
                 message = 'Dislike removed'
                 user_interaction = None
             else:
                 # User liked this post, change to dislike
                 interaction.interaction_type = PostInteraction.DISLIKE
                 interaction.save()
-                post.likes_count -= 1
+                post.likes_count = max(post.likes_count - 1, 0)
                 post.dislikes_count += 1
-                post.save()
                 message = 'Post disliked'
                 user_interaction = 'dislike'
                 
@@ -218,10 +237,12 @@ def dislike_post_view(request, post_id):
                 interaction_type=PostInteraction.DISLIKE
             )
             post.dislikes_count += 1
-            post.save()
             message = 'Post disliked'
             user_interaction = 'dislike'
     
+        # Save the post after updating counts
+        post.save()
+        
     return Response({
         'message': message,
         'likes_count': post.likes_count,
@@ -257,6 +278,27 @@ def post_comments_view(request, post_id):
             }, status=status.HTTP_400_BAD_REQUEST)
             
         comment = serializer.save(user=request.user, post=post)
+        
+        # Create notification for post author (if not commenting on own post)
+        if post.user != request.user:
+            Notification.objects.create(
+                receipient=post.user,
+                actor=request.user,
+                notification_type='comment',
+                post=post,
+                comment=comment
+            )
+            
+        # Create notification for parent comment author (if this is a reply)
+        if parent_comment and parent_comment.user != request.user and parent_comment.user != post.user:
+            Notification.objects.create(
+                receipient=parent_comment.user,
+                actor=request.user,
+                notification_type='reply',
+                post=post,
+                comment=comment
+            )
+
         response_serializer = CommentSerializer(comment, context={'request': request})
         return Response({
             'message': 'Comment created successfully',

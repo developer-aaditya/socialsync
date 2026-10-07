@@ -65,7 +65,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     college = models.CharField(max_length=500, null=True, blank=True)
     profile_picture = models.ImageField(
         upload_to='profile_pictures/',
-        blank=False,
+        blank=True,
+        null=True,
         validators=[
             # Only allow common image formats
             FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png'])

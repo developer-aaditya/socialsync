@@ -27,6 +27,9 @@ class UserSignupSerializer(serializers.ModelSerializer):
             'email': {'required': True},
             'username': {'required': True},
             'full_name': {'required': True},
+            'date_of_birth': {'required': True},
+            'profile_picture': {'required': False, 'allow_null': True},
+            'description': {'required': False, 'allow_null': True, 'allow_blank': True},
         }
     
     def validate_username(self, value):
@@ -97,15 +100,36 @@ class UserLoginSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("Must include email and password.")
 
+class FlexibleImageField(serializers.ImageField):
+    """
+    Custom ImageField that gracefully ignores re-sent string URLs, null values, or empty strings
+    when updating profile text fields without re-uploading a new image file.
+    """
+    def to_internal_value(self, data):
+        if isinstance(data, str) or data is None or data in ('null', ''):
+            return getattr(self.parent.instance, self.field_name, None) if (self.parent and self.parent.instance) else None
+        return super().to_internal_value(data)
+
+
+class FlexibleDateField(serializers.DateField):
+    """
+    Custom DateField that converts empty strings or 'null' string literals to None
+    so field-level validation can enforce mandatory DOB rules cleanly.
+    """
+    def to_internal_value(self, data):
+        if not data or data in ('null', ''):
+            return None
+        return super().to_internal_value(data)
+
+
 # Serializer for user profile
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(read_only=True)
     username = serializers.CharField(required=False)
     full_name = serializers.CharField(required=False)
-    date_of_birth = serializers.DateField(required=False)
-    profile_picture = serializers.ImageField(required=False, allow_null=True)
+    date_of_birth = FlexibleDateField(required=False, allow_null=True)
+    profile_picture = FlexibleImageField(required=False, allow_null=True)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    bio = serializers.CharField(source='description', required=False, allow_blank=True, allow_null=True)
     college = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
@@ -115,34 +139,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'username', 'full_name', 'date_of_birth', 
-            'profile_picture', 'date_joined', 'college', 'description', 'bio',
+            'profile_picture', 'date_joined', 'college', 'description',
             'followers_count', 'following_count', 'my_posts'
         ]
         read_only_fields = ['id', 'email', 'date_joined']
-
-    def to_internal_value(self, data):
-        # Handle string URLs or empty values gracefully for file and date fields
-        if hasattr(data, 'copy'):
-            data = data.copy()
-        else:
-            data = dict(data)
-
-        # Allow 'bio' key from frontend to set 'description'
-        if 'bio' in data and 'description' not in data:
-            data['description'] = data['bio']
-
-        if 'profile_picture' in data:
-            val = data['profile_picture']
-            if isinstance(val, str) or val is None or val == 'null' or val == '':
-                data.pop('profile_picture', None)
-
-        if 'date_of_birth' in data:
-            val = data['date_of_birth']
-            if not val or val == 'null' or val == '':
-                if self.instance and self.instance.date_of_birth:
-                    data.pop('date_of_birth', None)
-
-        return super().to_internal_value(data)
 
     def validate_date_of_birth(self, value):
         if not value:
@@ -192,11 +192,10 @@ class PublicUserProfileSerializer(serializers.ModelSerializer):
     is_following = serializers.SerializerMethodField()
     is_following_back = serializers.SerializerMethodField()
     user_posts = serializers.SerializerMethodField()  
-    bio = serializers.CharField(source='description', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'description', 'bio', 'college',
+        fields = ['id', 'username', 'full_name', 'description', 'college',
                 'profile_picture', 'followers_count', 'following_count',
                 'is_following', 'is_following_back', 'user_posts']
     

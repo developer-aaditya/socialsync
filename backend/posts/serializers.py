@@ -9,7 +9,6 @@ class PostSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     user_profile_picture = serializers.SerializerMethodField()
     user_description = serializers.CharField(source='user.description', read_only=True)
-    user_bio = serializers.CharField(source='user.description', read_only=True)
     user_college = serializers.CharField(source='user.college', read_only=True)
     
     # Show if current user has liked/disliked this post (read-only)
@@ -19,12 +18,12 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'user_email', 'user_name', 'user_username', 'user_profile_picture',
-            'user_description', 'user_bio', 'user_college',
+            'user_description', 'user_college',
             'image', 'description', 'likes_count', 'dislikes_count', 'created_at',
             'user_interaction'
         ]
         read_only_fields = ['id', 'user_email', 'user_name', 'user_username',
-                           'user_profile_picture', 'user_description', 'user_bio',
+                           'user_profile_picture', 'user_description',
                            'user_college', 'likes_count', 'dislikes_count',
                            'created_at', 'user_interaction']
 
