@@ -16,6 +16,8 @@ from django.db.models import F, Count, Case, When, Value, IntegerField, Expressi
 from django.utils import timezone
 from datetime import timedelta
 from .tasks import compress_and_convert_post_image
+from django.core.cache import cache
+from django.conf import settings
 
 
 
@@ -34,9 +36,19 @@ class ForYouPostCursorPagination(CursorPagination):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_all_posts_view(request):
-    # Retrieve the feed type from query parameters, defaulting to 'latest' if not provided.
-    feed_type = request.query_params.get('feed_type', 'latest')
+    # Retrieve pagenated posts feed with redis caching
+    feed_type = request.query_params.get('feed_type', 'latest') # Default to 'latest' feed if not specified
+    cursor_param = request.query_params.get('cursor', 'first_page')  # Default to first page if no cursor is provided
+
+    # Build a unique cache key based on feed type, user ID, and cursor parameter
+    cache_key = f"feed:{feed_type}:user:{request.user.id}:cursor:{cursor_param}"
     
+    # Check if the feed is already cached in Redis
+    cached_response = cache.get(cache_key)
+    if cached_response:
+        return Response(cached_response, status=status.HTTP_200_OK)
+
+    # If not cached, fetch posts from the database based on feed type
     if feed_type == 'for_you':
         # Fetch posts from the last 7 days for the "For You" feed.
         seven_days_ago = timezone.now() - timedelta(days=7)
@@ -59,19 +71,22 @@ def get_all_posts_view(request):
         )
         # 3. Apply Cursor Pagination on DB-ranked QuerySet (LIMIT 5 per fetch)
         paginator = ForYouPostCursorPagination()
-        paginated_posts = paginator.paginate_queryset(posts, request)
-        serializer = PostSerializer(paginated_posts, many=True, context={'request': request})
-        return paginator.get_paginated_response(serializer.data)
         
     else:
         # Default latest feed with cursor pagination for performance and scalability.
         posts = Post.objects.all().order_by('-created_at')
         paginator = LatestPostCursorPagination()
-        paginated_posts = paginator.paginate_queryset(posts, request)
-        serializer = PostSerializer(paginated_posts, many=True, context={'request': request})
+        
+    paginated_posts = paginator.paginate_queryset(posts, request)
+    serializer = PostSerializer(paginated_posts, many=True, context={'request': request})
+    response = paginator.get_paginated_response(serializer.data).data
 
-        # Return the DRF paginated response (includes next/previous links and count)
-        return paginator.get_paginated_response(serializer.data)
+    # Cache the response for future requests
+    cache_set_ttl = getattr(settings, 'CACHE_TTL', 60 * 15)  # Use the cache TTL defined in settings.py
+    cache.set(cache_key, response, timeout=cache_set_ttl)
+
+    # Return the DRF paginated response (includes next/previous links and count)
+    return response(response, status=status.HTTP_200_OK)
     
 
 @api_view(['GET', 'POST'])

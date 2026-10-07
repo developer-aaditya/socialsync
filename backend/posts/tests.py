@@ -109,7 +109,7 @@ class PostsAndCommentsAPITests(APITestCase):
             description='Post to be deleted',
             image=self.dummy_image
         )
-        delete_url = reverse('delete_post', kwargs={'post_id': post.id})
+        delete_url = reverse('single_post', kwargs={'post_id': post.id})
 
         # User2 attempts to delete User1's post -> 403 Forbidden
         self.client.force_authenticate(user=self.user2)

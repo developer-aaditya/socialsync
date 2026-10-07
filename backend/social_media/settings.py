@@ -200,3 +200,17 @@ CELERY_RESULT_SERIALIZER = 'json'
 
 # Store times in UTC format for consistency across different time zones
 CELERY_TIMEZONE = TIME_ZONE
+
+
+# REDIS CACHE CONFIGURATION
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+CACHE_TTL = 60 * 15  # Cache Time-to-Live: 15 minutes
