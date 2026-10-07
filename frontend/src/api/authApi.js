@@ -102,6 +102,9 @@ export const authApi = {
       if (data.college) {
         formData.append("college", data.college);
       }
+      if (data.description !== undefined && data.description !== null) {
+        formData.append("description", data.description);
+      }
       if (data.profile_picture) {
         formData.append("profile_picture", data.profile_picture);
       }

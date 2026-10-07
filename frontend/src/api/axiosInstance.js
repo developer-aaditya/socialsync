@@ -1,16 +1,16 @@
-import axios from 'axios';
-import { tokenService } from '../utils/tokenService';
+import axios from "axios";
+import { tokenService } from "../utils/tokenService";
 
 // Create Axios instance with base URL
 export const axiosInstance = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/',
+  baseURL: "http://127.0.0.1:8000/api/",
 });
 
 // Ensure Content-Type is set appropriately per request
 axiosInstance.interceptors.request.use((config) => {
   const isFormData = config.data instanceof FormData;
-  if (!isFormData && !config.headers['Content-Type']) {
-    config.headers['Content-Type'] = 'application/json';
+  if (!isFormData && !config.headers["Content-Type"]) {
+    config.headers["Content-Type"] = "application/json";
   }
   return config;
 });
@@ -26,7 +26,7 @@ axiosInstance.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor: Handle 401 errors and token refresh
@@ -46,8 +46,8 @@ axiosInstance.interceptors.response.use(
         if (refreshToken) {
           // Attempt to refresh the token
           const response = await axios.post(
-            'http://127.0.0.1:8000/api/token/refresh/',
-            { refresh: refreshToken }
+            "http://127.0.0.1:8000/api/token/refresh/",
+            { refresh: refreshToken },
           );
 
           const { access } = response.data;
@@ -57,21 +57,25 @@ axiosInstance.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${access}`;
           return axiosInstance(originalRequest);
         }
-      } catch (refreshError) {  // Refresh failed
+      } catch (refreshError) {
+        // Refresh failed
         const status = refreshError.response?.status;
         if (status === 401 || status === 403) {
           tokenService.clearTokens();
-          window.dispatchEvent(new Event('FORCE_LOGOUT'));
+          window.dispatchEvent(new Event("FORCE_LOGOUT"));
         } else {
           // Network/server error – preserve tokens and surface error
-          console.warn('Token refresh failed (network/server). Preserving tokens.', refreshError);
+          console.warn(
+            "Token refresh failed (network/server). Preserving tokens.",
+            refreshError,
+          );
         }
         return Promise.reject(refreshError);
       }
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosInstance;

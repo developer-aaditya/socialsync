@@ -1,0 +1,151 @@
+/* ==========================================================================
+   INSTAGRAM-STYLE PHOTO GRID STYLES
+   ========================================================================== */
+
+.insta-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.insta-grid-tile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--bg-input, #0b0f19);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.insta-grid-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.insta-tile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.insta-tile-text {
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.2) 0%, rgba(15, 23, 42, 0.95) 100%);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+[data-theme="light"] .insta-tile-text {
+  background: linear-gradient(135deg, rgba(224, 231, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 100%);
+}
+
+.tile-quote-icon {
+  font-size: 2.2rem;
+  color: #6366f1;
+  opacity: 0.6;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.tile-text-snippet {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+/* Instagram Hover Overlay */
+.insta-tile-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: #ffffff;
+}
+
+.insta-grid-tile:hover .insta-tile-overlay {
+  opacity: 1;
+}
+
+.overlay-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.insta-grid-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border-radius: 1rem;
+  border: 1px dashed var(--border-color);
+  margin-top: 1rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .insta-grid-container {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 0.5rem;
+  }
+
+  .insta-grid-tile {
+    border-radius: 6px;
+    box-shadow: none;
+    border-color: var(--border-color, rgba(255, 255, 255, 0.05));
+  }
+
+  .insta-tile-text {
+    padding: 0.4rem;
+  }
+
+  .tile-quote-icon {
+    font-size: 1.4rem;
+    margin-bottom: 0;
+  }
+
+  .tile-text-snippet {
+    font-size: 0.7rem;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .overlay-stat {
+    font-size: 0.85rem;
+    gap: 0.25rem;
+  }
+}

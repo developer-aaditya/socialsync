@@ -16,7 +16,16 @@ export const themeService = {
       activeTheme = prefersDark ? 'dark' : 'light';
     }
 
+    // Force instant DOM-wide repaint without transition delay lags
+    document.documentElement.classList.add('theme-switching');
     document.documentElement.setAttribute('data-theme', activeTheme);
+    
+    // Force layout flush so all elements update on the exact same frame
+    void document.documentElement.offsetHeight;
+
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-switching');
+    }, 60);
   },
 
   initSystemListener: (callback) => {
@@ -25,7 +34,7 @@ export const themeService = {
       const stored = themeService.getStoredTheme();
       if (stored === 'default') {
         const activeTheme = e.matches ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', activeTheme);
+        themeService.applyTheme('default');
         if (callback) callback(activeTheme);
       }
     };

@@ -12,6 +12,12 @@ export const postApi = {
     return response.data;
   },
 
+  // Fetch single post by ID
+  getPost: async (postId) => {
+    const response = await axiosInstance.get(`posts/${postId}/`);
+    return response.data;
+  },
+
   // Create a new post
   createPost: async (description, image) => {
     const formData = new FormData();

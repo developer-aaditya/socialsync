@@ -92,6 +92,19 @@
   margin-bottom: 6px;
 }
 
+.comment-author-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-author-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .comment-author {
   color: var(--comment-author, #818cf8);
   font-weight: 700;
@@ -178,4 +191,66 @@
   padding-left: 12px;
   border-left: 2px solid rgba(99, 102, 241, 0.3);
   margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .main-comment-form {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .comment-input {
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+
+  .btn-comment-submit {
+    padding: 0 14px;
+    height: 42px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .comment-bubble {
+    padding: 10px 12px;
+  }
+
+  .comment-meta {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .comment-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .comment-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 32px;
+  }
+
+  .reply-form {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .reply-input {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .reply-submit-btn {
+    padding: 0 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .nested-replies {
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left-width: 2px;
+  }
 }

@@ -1,8 +1,10 @@
+import { tokenService } from '../utils/tokenService';
+
 // Auth reducer actions
 export const INITIAL_STATE = {
   user: null,
   isAuthenticated: false,
-  loading: false,
+  loading: tokenService.hasToken(),
   error: null,
 };
 
@@ -37,6 +39,7 @@ export const authReducer = (state, action) => {
 
     // Update profile
     case 'UPDATE_PROFILE':
+    case 'UPDATE_USER':
       return {
         ...state,
         user: action.payload,

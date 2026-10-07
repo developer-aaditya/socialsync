@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import postApi from '../api/postApi';
+import userApi from '../api/userApi';
 import { useAuth } from '../hooks/useAuth';
+import getMediaUrl from '../utils/mediaUrl';
+import FormattedText from './FormattedText';
+import MentionDropdown from './MentionDropdown';
+import PublicProfileModal from './PublicProfileModal';
 import '../styles/comments.css';
 
-const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOwnerEmail }) => {
+const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOwnerEmail, onNavigateToProfile }) => {
   const { user } = useAuth();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -12,14 +17,99 @@ const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOw
   const [userInteraction, setUserInteraction] = useState(comment.user_interaction);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedCommentatorUsername, setSelectedCommentatorUsername] = useState(null);
+
+  // Mention Autocomplete States for Reply & Debounce Ref
+  const [mentionUsers, setMentionUsers] = useState([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionQueryState, setMentionQueryState] = useState({ query: '', startIndex: -1, cursorEnd: -1 });
+
+  const replyMentionTimerRef = useRef(null);
+  const replyMentionBoxRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (replyMentionBoxRef.current && !replyMentionBoxRef.current.contains(e.target)) {
+        setShowMentionDropdown(false);
+      }
+    };
+    if (showMentionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMentionDropdown]);
 
   const isAuthor = user?.email === comment.user_email;
   const isPostOwner = user?.email === postOwnerEmail;
   const canDelete = isAuthor || isPostOwner;
 
+  const handleCommentatorClick = (e) => {
+    e.stopPropagation();
+    const targetHandle = comment.user_username || comment.user_name || comment.user_email;
+    if (targetHandle) {
+      if (onNavigateToProfile) {
+        onNavigateToProfile(targetHandle);
+      } else {
+        setSelectedCommentatorUsername(targetHandle);
+      }
+    }
+  };
+
+  const handleReplyChange = (e) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setReplyText(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/);
+
+    if (match) {
+      const q = match[1];
+      setMentionQueryState({
+        query: q,
+        startIndex: match.index,
+        cursorEnd: cursorPos,
+      });
+
+      setShowMentionDropdown(true);
+      setMentionLoading(true);
+
+      if (replyMentionTimerRef.current) clearTimeout(replyMentionTimerRef.current);
+
+      replyMentionTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await userApi.searchUsers(q);
+          setMentionUsers(res || []);
+        } catch (err) {
+          console.error('Reply mention search error:', err);
+        } finally {
+          setMentionLoading(false);
+        }
+      }, 300);
+    } else {
+      setShowMentionDropdown(false);
+      setMentionLoading(false);
+      if (replyMentionTimerRef.current) clearTimeout(replyMentionTimerRef.current);
+    }
+  };
+
+  const handleSelectReplyMention = (username) => {
+    const { startIndex, cursorEnd } = mentionQueryState;
+    if (startIndex !== -1) {
+      const before = replyText.slice(0, startIndex);
+      const after = replyText.slice(cursorEnd);
+      const updated = `${before}@${username} `;
+      setReplyText(updated);
+    }
+    setShowMentionDropdown(false);
+  };
+
   const handleLike = async () => {
     try {
-      const res = await postApi.likeComment(comment.id);
+      await postApi.likeComment(comment.id);
       if (userInteraction === 'like') {
         setUserInteraction(null);
         setLikesCount(prev => Math.max(0, prev - 1));
@@ -35,7 +125,7 @@ const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOw
 
   const handleDislike = async () => {
     try {
-      const res = await postApi.dislikeComment(comment.id);
+      await postApi.dislikeComment(comment.id);
       if (userInteraction === 'dislike') {
         setUserInteraction(null);
         setDislikesCount(prev => Math.max(0, prev - 1));
@@ -64,10 +154,12 @@ const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOw
     if (!replyText.trim()) return;
     setLoading(true);
     setError(null);
+    setShowMentionDropdown(false);
     try {
       await postApi.addComment(postId, replyText, comment.id);
       setReplyText('');
       setShowReplyForm(false);
+      window.dispatchEvent(new Event('REFRESH_NOTIFICATIONS'));
       if (onCommentAdded) onCommentAdded();
     } catch (err) {
       const apiErr = err.response?.data?.text?.[0] || err.response?.data?.non_field_errors?.[0] || err.response?.data?.error || 'Failed to submit reply';
@@ -78,80 +170,148 @@ const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOw
   };
 
   return (
-    <div className="comment-node">
-      <div className="comment-bubble">
-        <div className="comment-meta">
-          <span className="comment-author">{comment.user_name || comment.user_email}</span>
-          <span className="comment-date">
-            {new Date(comment.created_at).toLocaleDateString()} at{' '}
-            {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        </div>
+    <>
+      <div className="comment-node">
+        <div className="comment-bubble">
+          <div className="comment-meta">
+            <div
+              className="comment-author-box"
+              onClick={handleCommentatorClick}
+              style={{ cursor: 'pointer' }}
+              title="View Profile"
+            >
+              <img
+                src={
+                  comment.user_profile_picture
+                    ? getMediaUrl(comment.user_profile_picture)
+                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        comment.user_name || 'User'
+                      )}&background=6366f1&color=fff`
+                }
+                alt={comment.user_name}
+                className="comment-author-avatar"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    comment.user_name || 'User'
+                  )}&background=6366f1&color=fff`;
+                }}
+              />
+              <span className="comment-author">{comment.user_name || comment.user_email}</span>
+            </div>
+            <span className="comment-date">
+              {new Date(comment.created_at).toLocaleDateString()} at{' '}
+              {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
 
-        <p className="comment-text">{comment.text}</p>
+          <p className="comment-text">
+            <FormattedText text={comment.text} onNavigateToProfile={onNavigateToProfile} />
+          </p>
 
-        {error && <div className="ai-moderation-alert">🤖 {error}</div>}
+          {error && <div className="ai-moderation-alert">🤖 {error}</div>}
 
-        <div className="comment-actions">
-          <button className={`comment-btn ${userInteraction === 'like' ? 'active-like' : ''}`} onClick={handleLike}>
-            👍 {likesCount > 0 && likesCount}
-          </button>
-          <button className={`comment-btn ${userInteraction === 'dislike' ? 'active-dislike' : ''}`} onClick={handleDislike}>
-            👎 {dislikesCount > 0 && dislikesCount}
-          </button>
-          <button className="comment-btn reply-btn" onClick={() => setShowReplyForm(!showReplyForm)}>
-            ↩️ Reply
-          </button>
-          {canDelete && (
-            <button className="comment-btn delete-btn" onClick={handleDelete} title="Delete comment">
-              🗑️
+          <div className="comment-actions">
+            <button className={`comment-btn ${userInteraction === 'like' ? 'active-like' : ''}`} onClick={handleLike}>
+              👍 {likesCount > 0 && likesCount}
             </button>
+            <button className={`comment-btn ${userInteraction === 'dislike' ? 'active-dislike' : ''}`} onClick={handleDislike}>
+              👎 {dislikesCount > 0 && dislikesCount}
+            </button>
+            <button className="comment-btn reply-btn" onClick={() => setShowReplyForm(!showReplyForm)}>
+              ↩️ Reply
+            </button>
+            {canDelete && (
+              <button className="comment-btn delete-btn" onClick={handleDelete} title="Delete comment">
+                🗑️
+              </button>
+            )}
+          </div>
+
+          {showReplyForm && (
+            <form className="reply-form" onSubmit={handleReplySubmit}>
+              <div className="reply-input-box" ref={replyMentionBoxRef} style={{ position: 'relative', flex: 1 }}>
+                <input
+                  type="text"
+                  className="reply-input"
+                  placeholder={`Replying to ${comment.user_name || comment.user_email}... (Type @ to mention)`}
+                  value={replyText}
+                  onChange={handleReplyChange}
+                  disabled={loading}
+                  autoFocus
+                />
+                {showMentionDropdown && (
+                  <MentionDropdown
+                    users={mentionUsers}
+                    onSelect={handleSelectReplyMention}
+                    loading={mentionLoading}
+                  />
+                )}
+              </div>
+              <button type="submit" className="reply-submit-btn" disabled={loading || !replyText.trim()}>
+                {loading ? 'Sending...' : 'Post Reply'}
+              </button>
+            </form>
           )}
         </div>
 
-        {showReplyForm && (
-          <form className="reply-form" onSubmit={handleReplySubmit}>
-            <input
-              type="text"
-              className="reply-input"
-              placeholder={`Replying to ${comment.user_name || comment.user_email}...`}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              disabled={loading}
-              autoFocus
-            />
-            <button type="submit" className="reply-submit-btn" disabled={loading || !replyText.trim()}>
-              {loading ? 'Sending...' : 'Post Reply'}
-            </button>
-          </form>
+        {/* Recursive Nested Replies Rendering */}
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="nested-replies">
+            {comment.replies.map(reply => (
+              <CommentItem
+                key={reply.id}
+                comment={reply}
+                postId={postId}
+                onCommentAdded={onCommentAdded}
+                onCommentDeleted={onCommentDeleted}
+                postOwnerEmail={postOwnerEmail}
+                onNavigateToProfile={onNavigateToProfile}
+              />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Recursive Nested Replies Rendering */}
-      {comment.replies && comment.replies.length > 0 && (
-        <div className="nested-replies">
-          {comment.replies.map(reply => (
-            <CommentItem
-              key={reply.id}
-              comment={reply}
-              postId={postId}
-              onCommentAdded={onCommentAdded}
-              onCommentDeleted={onCommentDeleted}
-              postOwnerEmail={postOwnerEmail}
-            />
-          ))}
-        </div>
+      {selectedCommentatorUsername && (
+        <PublicProfileModal
+          username={selectedCommentatorUsername}
+          onClose={() => setSelectedCommentatorUsername(null)}
+        />
       )}
-    </div>
+    </>
   );
 };
 
-const CommentSection = ({ postId, postOwnerEmail }) => {
+const CommentSection = ({ postId, postOwnerEmail, onNavigateToProfile }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Mention Autocomplete States for Main Comment & Debounce Ref
+  const [mentionUsers, setMentionUsers] = useState([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionQueryState, setMentionQueryState] = useState({ query: '', startIndex: -1, cursorEnd: -1 });
+
+  const mainMentionTimerRef = useRef(null);
+  const mainMentionBoxRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (mainMentionBoxRef.current && !mainMentionBoxRef.current.contains(e.target)) {
+        setShowMentionDropdown(false);
+      }
+    };
+    if (showMentionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMentionDropdown]);
 
   useEffect(() => {
     fetchComments();
@@ -169,14 +329,65 @@ const CommentSection = ({ postId, postOwnerEmail }) => {
     }
   };
 
+  const handleMainCommentChange = (e) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setNewComment(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/);
+
+    if (match) {
+      const q = match[1];
+      setMentionQueryState({
+        query: q,
+        startIndex: match.index,
+        cursorEnd: cursorPos,
+      });
+
+      setShowMentionDropdown(true);
+      setMentionLoading(true);
+
+      if (mainMentionTimerRef.current) clearTimeout(mainMentionTimerRef.current);
+
+      mainMentionTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await userApi.searchUsers(q);
+          setMentionUsers(res || []);
+        } catch (err) {
+          console.error('Comment mention search error:', err);
+        } finally {
+          setMentionLoading(false);
+        }
+      }, 300);
+    } else {
+      setShowMentionDropdown(false);
+      setMentionLoading(false);
+      if (mainMentionTimerRef.current) clearTimeout(mainMentionTimerRef.current);
+    }
+  };
+
+  const handleSelectMainMention = (username) => {
+    const { startIndex, cursorEnd } = mentionQueryState;
+    if (startIndex !== -1) {
+      const before = newComment.slice(0, startIndex);
+      const after = newComment.slice(cursorEnd);
+      const updated = `${before}@${username} `;
+      setNewComment(updated);
+    }
+    setShowMentionDropdown(false);
+  };
+
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
     setSubmitting(true);
     setError(null);
+    setShowMentionDropdown(false);
     try {
       await postApi.addComment(postId, newComment);
       setNewComment('');
+      window.dispatchEvent(new Event('REFRESH_NOTIFICATIONS'));
       fetchComments();
     } catch (err) {
       const apiErr = err.response?.data?.text?.[0] || err.response?.data?.non_field_errors?.[0] || err.response?.data?.error || 'Failed to add comment';
@@ -191,14 +402,23 @@ const CommentSection = ({ postId, postOwnerEmail }) => {
       <h4 className="comment-section-title">💬 Discussion ({comments.length})</h4>
 
       <form className="main-comment-form" onSubmit={handleAddComment}>
-        <input
-          type="text"
-          className="comment-input"
-          placeholder="Write a comment... (AI Content Moderation Active)"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          disabled={submitting}
-        />
+        <div className="comment-input-box" ref={mainMentionBoxRef} style={{ position: 'relative', flex: 1 }}>
+          <input
+            type="text"
+            className="comment-input"
+            placeholder="Write a comment... (Type @ to mention someone)"
+            value={newComment}
+            onChange={handleMainCommentChange}
+            disabled={submitting}
+          />
+          {showMentionDropdown && (
+            <MentionDropdown
+              users={mentionUsers}
+              onSelect={handleSelectMainMention}
+              loading={mentionLoading}
+            />
+          )}
+        </div>
         <button type="submit" className="btn-comment-submit" disabled={submitting || !newComment.trim()}>
           {submitting ? 'Posting...' : 'Comment'}
         </button>
@@ -224,6 +444,7 @@ const CommentSection = ({ postId, postOwnerEmail }) => {
               onCommentAdded={fetchComments}
               onCommentDeleted={fetchComments}
               postOwnerEmail={postOwnerEmail}
+              onNavigateToProfile={onNavigateToProfile}
             />
           ))}
         </div>

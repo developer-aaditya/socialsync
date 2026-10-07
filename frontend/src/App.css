@@ -25,6 +25,15 @@ body {
   min-height: 100vh;
 }
 
+.app-initial-loader {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
 .app-main {
   flex: 1;
   display: flex;

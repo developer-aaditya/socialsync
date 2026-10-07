@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import '../styles/post.css';
 import postApi from '../api/postApi';
+import userApi from '../api/userApi';
 import { useAuth } from '../hooks/useAuth';
 import ImageCropperModal from './ImageCropperModal';
+import MentionDropdown from './MentionDropdown';
 
 const PostForm = ({ onPostCreated }) => {
   const { user } = useAuth();
@@ -12,6 +14,78 @@ const PostForm = ({ onPostCreated }) => {
   const [showCropper, setShowCropper] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Mention Autocomplete States & Debounce Ref
+  const [mentionUsers, setMentionUsers] = useState([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionQueryState, setMentionQueryState] = useState({ query: '', startIndex: -1, cursorEnd: -1 });
+
+  const mentionTimerRef = useRef(null);
+  const mentionBoxRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (mentionBoxRef.current && !mentionBoxRef.current.contains(e.target)) {
+        setShowMentionDropdown(false);
+      }
+    };
+    if (showMentionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMentionDropdown]);
+
+  const handleDescriptionChange = (e) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setDescription(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/);
+
+    if (match) {
+      const q = match[1];
+      setMentionQueryState({
+        query: q,
+        startIndex: match.index,
+        cursorEnd: cursorPos,
+      });
+
+      setShowMentionDropdown(true);
+      setMentionLoading(true);
+
+      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
+
+      mentionTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await userApi.searchUsers(q);
+          setMentionUsers(res || []);
+        } catch (err) {
+          console.error('Mention search error:', err);
+        } finally {
+          setMentionLoading(false);
+        }
+      }, 300);
+    } else {
+      setShowMentionDropdown(false);
+      setMentionLoading(false);
+      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
+    }
+  };
+
+  const handleSelectMention = (username) => {
+    const { startIndex, cursorEnd } = mentionQueryState;
+    if (startIndex !== -1) {
+      const before = description.slice(0, startIndex);
+      const after = description.slice(cursorEnd);
+      const updated = `${before}@${username} `;
+      setDescription(updated);
+    }
+    setShowMentionDropdown(false);
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -53,11 +127,12 @@ const PostForm = ({ onPostCreated }) => {
 
     setLoading(true);
     setError(null);
+    setShowMentionDropdown(false);
 
     try {
       const res = await postApi.createPost(description, image);
       const createdPost = res.post || res;
-      
+
       setDescription('');
       setImage(null);
       setImagePreview(null);
@@ -90,14 +165,25 @@ const PostForm = ({ onPostCreated }) => {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <textarea
-            className="post-textarea"
-            placeholder={`What's on your mind, ${user?.full_name?.split(' ')[0]}? (AI Content Screening Active)`}
-            rows="3"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={loading}
-          />
+          <div className="textarea-mention-box" ref={mentionBoxRef} style={{ position: 'relative' }}>
+            <textarea
+              className="post-textarea"
+              placeholder={`What's on your mind, ${user?.full_name?.split(' ')[0]}? (Type @ to mention someone)`}
+              rows="3"
+              value={description}
+              onChange={handleDescriptionChange}
+              disabled={loading}
+            />
+
+            {/* Mention Autocomplete Overlay attached directly under textarea */}
+            {showMentionDropdown && (
+              <MentionDropdown
+                users={mentionUsers}
+                onSelect={handleSelectMention}
+                loading={mentionLoading}
+              />
+            )}
+          </div>
 
           {imagePreview && (
             <div className="image-preview-wrapper">

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import '../styles/cropper.css';
 
-const ImageCropperModal = ({ imageUrl, onCropComplete, onClose }) => {
+const ImageCropperModal = ({ imageUrl, onCropComplete, onClose, lockAspectRatio = '1:1', isProfileCrop = false }) => {
+  const defaultRatio = lockAspectRatio || (isProfileCrop ? '1:1' : 'full');
   const [zoom, setZoom] = useState(1);
-  const [aspectRatio, setAspectRatio] = useState('full'); // 'full', '1:1', '4:3', '16:9'
+  const [aspectRatio, setAspectRatio] = useState(defaultRatio);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -11,6 +12,12 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose }) => {
 
   const previewCanvasRef = useRef(null);
   const imageRef = useRef(null);
+
+  useEffect(() => {
+    if (lockAspectRatio) {
+      setAspectRatio(lockAspectRatio);
+    }
+  }, [lockAspectRatio]);
 
   useEffect(() => {
     const img = new Image();
@@ -43,7 +50,7 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose }) => {
       case '4:3': return { width: 440, height: 330, ratio: 4/3 };
       case '16:9': return { width: 480, height: 270, ratio: 16/9 };
       case '1:1':
-      default: return { width: 360, height: 360, ratio: 1/1 };
+      default: return { width: 340, height: 340, ratio: 1/1 };
     }
   };
 
@@ -103,7 +110,8 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose }) => {
     }
 
     const target = getTargetDimensions();
-    const exportWidth = Math.max(1200, img.naturalWidth || 1200);
+    const exportSize = 800; // 800x800 high res 1:1 box output
+    const exportWidth = exportSize;
     const exportHeight = Math.round(exportWidth / target.ratio);
 
     const exportCanvas = document.createElement('canvas');
@@ -128,10 +136,10 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose }) => {
     exportCanvas.toBlob((blob) => {
       if (blob) {
         const croppedUrl = URL.createObjectURL(blob);
-        const croppedFile = new File([blob], 'cropped-image.jpg', { type: 'image/jpeg' });
+        const croppedFile = new File([blob], 'profile_picture_1to1.jpg', { type: 'image/jpeg' });
         onCropComplete(croppedFile, croppedUrl);
       }
-    }, 'image/jpeg', 1.0);
+    }, 'image/jpeg', 0.95);
   };
 
   const target = getTargetDimensions();
@@ -140,77 +148,61 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose }) => {
     <div className="crop-modal-overlay">
       <div className="crop-modal-card" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
         <div className="crop-header">
-          <h3>✂️ Crop Image</h3>
+          <h3>✂️ Crop Profile Picture (1:1 Box)</h3>
           <button className="crop-close-btn" onClick={onClose}>×</button>
         </div>
 
-        <div className="crop-canvas-container">
+        <div className="crop-canvas-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {!imageLoaded ? (
             <div className="crop-loading-placeholder">Loading image preview...</div>
           ) : (
-            <canvas
-              ref={previewCanvasRef}
-              className="crop-canvas"
-              style={{ width: `${target.width}px`, height: `${target.height}px` }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-            />
+            <div className="crop-box-viewport" style={{ position: 'relative', width: `${target.width}px`, height: `${target.height}px`, borderRadius: isProfileCrop ? '50%' : '16px', overflow: 'hidden', border: '3px solid #6366f1', boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)' }}>
+              <canvas
+                ref={previewCanvasRef}
+                className="crop-canvas"
+                style={{ width: '100%', height: '100%', cursor: 'grab' }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+              />
+            </div>
           )}
-          {aspectRatio !== 'full' && imageLoaded && (
-            <span className="crop-drag-hint">🖐️ Drag image to adjust frame position</span>
+          {imageLoaded && (
+            <span className="crop-drag-hint" style={{ marginTop: '10px' }}>🖐️ Drag image to center & use slider to zoom</span>
           )}
         </div>
 
         <div className="crop-controls">
-          <div className="control-group">
-            <label>Aspect Ratio / Mode:</label>
-            <div className="ratio-btn-group">
-              <button
-                className={`ratio-btn ${aspectRatio === 'full' ? 'active' : ''}`}
-                onClick={() => { setAspectRatio('full'); setOffset({ x: 0, y: 0 }); setZoom(1); }}
-              >
-                Full (Original)
-              </button>
-              <button
-                className={`ratio-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
-                onClick={() => { setAspectRatio('1:1'); setOffset({ x: 0, y: 0 }); }}
-              >
-                1:1 Square
-              </button>
-              <button
-                className={`ratio-btn ${aspectRatio === '4:3' ? 'active' : ''}`}
-                onClick={() => { setAspectRatio('4:3'); setOffset({ x: 0, y: 0 }); }}
-              >
-                4:3 Photo
-              </button>
-              <button
-                className={`ratio-btn ${aspectRatio === '16:9' ? 'active' : ''}`}
-                onClick={() => { setAspectRatio('16:9'); setOffset({ x: 0, y: 0 }); }}
-              >
-                16:9 Wide
-              </button>
-            </div>
-          </div>
-
-          {aspectRatio !== 'full' && (
+          {!isProfileCrop && !lockAspectRatio && (
             <div className="control-group">
-              <label>Zoom Level: {zoom.toFixed(1)}x</label>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.1"
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className="zoom-slider"
-              />
+              <label>Aspect Ratio / Mode:</label>
+              <div className="ratio-btn-group">
+                <button
+                  className={`ratio-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
+                  onClick={() => { setAspectRatio('1:1'); setOffset({ x: 0, y: 0 }); }}
+                >
+                  1:1 Box
+                </button>
+              </div>
             </div>
           )}
+
+          <div className="control-group">
+            <label>Zoom Level: {zoom.toFixed(1)}x</label>
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="0.05"
+              value={zoom}
+              onChange={(e) => setZoom(parseFloat(e.target.value))}
+              className="zoom-slider"
+            />
+          </div>
         </div>
 
         <div className="crop-footer">
           <button className="btn-crop-cancel" onClick={onClose}>Cancel</button>
-          <button className="btn-crop-confirm" onClick={handleApplyCrop}>Apply Crop ✂️</button>
+          <button className="btn-crop-confirm" onClick={handleApplyCrop}>Save 1:1 Box Crop ✂️</button>
         </div>
       </div>
     </div>

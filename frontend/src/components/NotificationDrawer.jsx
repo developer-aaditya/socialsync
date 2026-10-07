@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import notificationApi from '../api/notificationApi';
 import '../styles/notifications.css';
 
-const NotificationDrawer = ({ isOpen, onClose, unreadCount, onUpdateUnreadCount }) => {
+const NotificationDrawer = ({ isOpen, onClose, unreadCount, onUpdateUnreadCount, onOpenPost, onNavigateToProfile }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -43,6 +43,20 @@ const NotificationDrawer = ({ isOpen, onClose, unreadCount, onUpdateUnreadCount 
     }
   };
 
+  const handleNotificationClick = (n) => {
+    if (!n.is_read) {
+      handleMarkAsRead(n.id);
+    }
+    onClose();
+
+    const targetPostId = n.target_post_id || n.post;
+    if (targetPostId && onOpenPost) {
+      onOpenPost(targetPostId);
+    } else if (n.actor_username && onNavigateToProfile) {
+      onNavigateToProfile(n.actor_username);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     try {
       await notificationApi.markAllAsRead();
@@ -63,17 +77,21 @@ const NotificationDrawer = ({ isOpen, onClose, unreadCount, onUpdateUnreadCount 
       case 'dislike': return '👎';
       case 'comment': return '💬';
       case 'reply': return '↩️';
+      case 'mention': return '🏷️';
       default: return '🔔';
     }
   };
 
   const getMessage = (n) => {
-    const actor = n.actor_name || n.actor_email;
+    const actor = n.actor_name || n.actor_username || n.actor_email;
     switch (n.notification_type) {
       case 'like': return `${actor} liked your post.`;
       case 'dislike': return `${actor} disliked your post.`;
       case 'comment': return `${actor} commented on your post.`;
       case 'reply': return `${actor} replied to your comment.`;
+      case 'mention': return `${actor} mentioned you in a post or comment.`;
+      case 'follow': return `${actor} started following you.`;
+      case 'follow_back': return `${actor} followed you back.`;
       default: return `${actor} interacted with your content.`;
     }
   };
@@ -111,7 +129,8 @@ const NotificationDrawer = ({ isOpen, onClose, unreadCount, onUpdateUnreadCount 
               <div
                 key={n.id}
                 className={`notif-item ${!n.is_read ? 'unread' : ''}`}
-                onClick={() => !n.is_read && handleMarkAsRead(n.id)}
+                onClick={() => handleNotificationClick(n)}
+                style={{ cursor: 'pointer' }}
               >
                 <div className="notif-icon-circle">{getIcon(n.notification_type)}</div>
                 <div className="notif-content">

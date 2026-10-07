@@ -60,6 +60,14 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 html,
@@ -77,4 +85,12 @@ body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
+}
+
+/* Force instant single-frame DOM-wide theme switch across all elements */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
 }

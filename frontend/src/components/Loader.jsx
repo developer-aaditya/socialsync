@@ -1,22 +1,18 @@
-const Loader = () => {
+import React from 'react';
+import '../styles/auth.css';
+
+const Loader = ({ message = 'Loading SocialSync...' }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#f5f5f5',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '24px',
-          fontWeight: 'bold',
-          color: '#007bff',
-        }}
-      >
-        ⏳ Loading...
+    <div className="modern-splash-loader-container">
+      <div className="splash-card">
+        <div className="splash-logo-circle">
+          <span className="splash-brand-icon">⚡</span>
+        </div>
+        <h2 className="splash-brand-title">SocialSync</h2>
+        <div className="splash-progress-bar">
+          <div className="splash-progress-fill"></div>
+        </div>
+        <p className="splash-status-text">{message}</p>
       </div>
     </div>
   );

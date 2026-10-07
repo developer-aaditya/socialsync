@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import '../styles/auth.css';
 import authApi from '../api/authApi';
 import { tokenService } from '../utils/tokenService';
 import { useAuth } from '../hooks/useAuth';
+import themeService from '../utils/themeService';
 
 const Login = ({ setCurrentPage }) => {
   const [email, setEmail] = useState('');
@@ -10,6 +11,12 @@ const Login = ({ setCurrentPage }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { dispatch } = useAuth();
+
+  useEffect(() => {
+    themeService.applyTheme(themeService.getStoredTheme());
+    const cleanup = themeService.initSystemListener();
+    return () => cleanup();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,7 +70,9 @@ const Login = ({ setCurrentPage }) => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h1 className="auth-title">⚡ SocialSync</h1>
+        <div className="auth-header-row">
+          <h1 className="auth-title">⚡ SocialSync</h1>
+        </div>
         <p className="auth-subtitle">Sign in to sync with your network</p>
 
         <form onSubmit={handleSubmit} className="auth-form">

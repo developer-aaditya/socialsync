@@ -9,45 +9,68 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Profile from './pages/Profile';
 import PostFeed from './pages/PostFeed';
+import UserProfilePage from './pages/UserProfilePage';
+import PostDetailModal from './components/PostDetailModal';
+import postApi from './api/postApi';
 
 function App() {
-  // Get auth state from context
   const { isAuthenticated, loading, error: authError } = useAuth();
 
-  // Page navigation state (login, signup, profile, posts)
-  const [currentPage, setCurrentPage] = useState('login');
+  const [currentPage, setCurrentPage] = useState(() => tokenService.hasToken() ? 'posts' : 'login');
+  const [viewingUsername, setViewingUsername] = useState(null);
   const [globalError, setGlobalError] = useState(null);
+  const [activeModalPost, setActiveModalPost] = useState(null);
 
-  // Show global error if auth error occurs
   useEffect(() => {
     if (authError) {
       setGlobalError(authError);
     }
   }, [authError]);
 
-  // Navigation without URL changes
   const navigateToPage = (page) => {
     setCurrentPage(page);
+    if (page !== 'user-profile') {
+      setViewingUsername(null);
+    }
   };
 
-  // Initialize page based on authentication status
+  const navigateToUserProfile = (username) => {
+    if (!username) return;
+    setViewingUsername(username);
+    setCurrentPage('user-profile');
+  };
+
+  const handleOpenPostById = async (postId) => {
+    if (!postId) return;
+    try {
+      const data = await postApi.getPost(postId);
+      if (data) {
+        setActiveModalPost(data);
+      }
+    } catch (err) {
+      console.error('Failed to load notification post detail:', err);
+      setGlobalError('Could not load the requested post.');
+    }
+  };
+
   useEffect(() => {
     const hasToken = tokenService.hasToken();
 
     if (hasToken && isAuthenticated) {
-      // If authenticated, default to posts
-      setCurrentPage('posts');
+      if (currentPage === 'login' || currentPage === 'signup') {
+        setCurrentPage('posts');
+      }
     } else if (!hasToken) {
-      // If not authenticated, show login
       setCurrentPage('login');
     }
   }, [isAuthenticated]);
 
-
-
-  // Show loader while initializing
   if (loading) {
-    return <Loader />;
+    return (
+      <div className="app-initial-loader">
+        <Loader />
+      </div>
+    );
   }
 
   return (
@@ -61,13 +84,17 @@ function App() {
 
       {/* Navbar (only shown when authenticated) */}
       {isAuthenticated && (
-        <Navbar currentPage={currentPage} setCurrentPage={navigateToPage} />
+        <Navbar
+          currentPage={currentPage}
+          setCurrentPage={navigateToPage}
+          onNavigateToProfile={navigateToUserProfile}
+          onOpenPost={handleOpenPostById}
+        />
       )}
 
       {/* Page Navigation - Conditional Rendering */}
       <main className="app-main">
         {!isAuthenticated ? (
-          // Authentication Pages
           <>
             {currentPage === 'login' && (
               <Login setCurrentPage={navigateToPage} />
@@ -77,13 +104,32 @@ function App() {
             )}
           </>
         ) : (
-          // Protected Pages (Only when authenticated)
           <>
-            {currentPage === 'profile' && <Profile />}
-            {currentPage === 'posts' && <PostFeed />}
+            {currentPage === 'profile' && (
+              <Profile onNavigateToProfile={navigateToUserProfile} />
+            )}
+            {currentPage === 'user-profile' && (
+              <UserProfilePage
+                username={viewingUsername}
+                onNavigateToProfile={navigateToUserProfile}
+                onNavigateBack={() => navigateToPage('posts')}
+              />
+            )}
+            {currentPage === 'posts' && (
+              <PostFeed onNavigateToProfile={navigateToUserProfile} />
+            )}
           </>
         )}
       </main>
+
+      {/* Notification Target Post Detail Lightbox Modal */}
+      {activeModalPost && (
+        <PostDetailModal
+          post={activeModalPost}
+          onClose={() => setActiveModalPost(null)}
+          onNavigateToProfile={navigateToUserProfile}
+        />
+      )}
     </div>
   );
 }

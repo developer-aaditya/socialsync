@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const restoreAuth = async () => {
       const token = tokenService.getAccessToken();
-      if(!token){
+      if (!token) {
         dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
@@ -28,9 +28,11 @@ export const AuthProvider = ({ children }) => {
         });
       } catch (error) {
         tokenService.clearTokens();
-        dispatch({ type: 'LOGOUT'})
+        dispatch({ type: 'LOGOUT' });
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
-    }
+    };
     restoreAuth();
   }, []);
 

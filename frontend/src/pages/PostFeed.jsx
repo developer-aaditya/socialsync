@@ -4,10 +4,11 @@ import postApi from "../api/postApi";
 import { useAuth } from "../hooks/useAuth";
 import PostForm from "../components/PostForm";
 import PostCard from "../components/PostCard";
-import Loader from "../components/Loader";
+import FeedSkeleton from "../components/FeedSkeleton";
 import getMediaUrl from "../utils/mediaUrl";
+import StoriesBar from "../components/StoriesBar";
 
-const PostFeed = () => {
+const PostFeed = ({ onNavigateToProfile }) => {
   const { user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [feedType, setFeedType] = useState('for_you'); // 'for_you' | 'latest'
@@ -15,6 +16,7 @@ const PostFeed = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [activeCommentPostId, setActiveCommentPostId] = useState(null);
 
   const sentinelRef = useRef(null);
 
@@ -30,8 +32,8 @@ const PostFeed = () => {
     fetchPosts(feedType);
   }, [user, feedType]);
 
-  const fetchPosts = async (type = feedType) => {
-    setLoading(true);
+  const fetchPosts = async (type = feedType, showSkeleton = true) => {
+    if (showSkeleton) setLoading(true);
     setError(null);
     try {
       const response = await postApi.getAllPosts(type);
@@ -57,7 +59,7 @@ const PostFeed = () => {
           "Failed to fetch feed posts"
       );
     } finally {
-      setLoading(false);
+      if (showSkeleton) setLoading(false);
     }
   };
 
@@ -130,13 +132,18 @@ const PostFeed = () => {
       <div className="feed-layout">
         {/* Sidebar - Profile & Stats Card */}
         <aside className="feed-sidebar">
-          <div className="glass-sidebar-card">
+          <div
+            className="glass-sidebar-card"
+            onClick={() => onNavigateToProfile && user?.username && onNavigateToProfile(user.username)}
+            style={{ cursor: 'pointer' }}
+            title="View Your Profile"
+          >
             <div className="sidebar-avatar-wrapper">
               <img
                 src={
                   user?.profile_picture
                     ? getMediaUrl(user.profile_picture)
-                    : "/default-profile.png"
+                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.full_name || 'User')}&background=6366f1&color=fff`
                 }
                 alt={user?.full_name}
                 className="sidebar-avatar"
@@ -147,7 +154,11 @@ const PostFeed = () => {
               />
             </div>
             <h3 className="sidebar-user-name">{user?.full_name}</h3>
-            <p className="sidebar-user-email">{user?.email}</p>
+            <p className="sidebar-user-handle">@{user?.username}</p>
+
+            {user?.description && (
+              <p className="sidebar-user-bio">{user.description}</p>
+            )}
 
             {user?.college && (
               <div className="sidebar-college-badge">
@@ -170,6 +181,9 @@ const PostFeed = () => {
 
         {/* Main Feed Content Area */}
         <main className="feed-main-content">
+          {/* 24-Hour Ephemeral Stories Bar */}
+          <StoriesBar />
+
           {/* Post Form */}
           <PostForm onPostCreated={handlePostCreated} />
 
@@ -194,9 +208,7 @@ const PostFeed = () => {
 
           {/* Feed List */}
           {loading ? (
-            <div className="feed-loading">
-              <Loader />
-            </div>
+            <FeedSkeleton count={2} />
           ) : (
             <div className="feed-posts-list">
               {posts.length > 0 ? (
@@ -206,6 +218,9 @@ const PostFeed = () => {
                     post={post}
                     onPostDeleted={() => fetchPosts(feedType)}
                     onPostUpdated={() => fetchPosts(feedType)}
+                    onNavigateToProfile={onNavigateToProfile}
+                    activeCommentPostId={activeCommentPostId}
+                    setActiveCommentPostId={setActiveCommentPostId}
                   />
                 ))
               ) : (
