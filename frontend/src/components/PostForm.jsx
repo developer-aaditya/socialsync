@@ -111,11 +111,19 @@ const PostForm = ({ onPostCreated }) => {
     setImagePreview(null);
   };
 
-  const formatErrorMessage = (rawMsg) => {
-    if (!rawMsg) return 'Failed to publish post.';
-    return rawMsg
-      .replace(/^Post rejected by AI Moderation:\s*/i, '')
-      .replace(/^AI Moderation Flagged:\s*/i, '');
+  const isAiModerationError = (msg) => {
+    if (!msg || typeof msg !== 'string') return false;
+    const lower = msg.toLowerCase();
+    return (
+      lower.includes('ai moderation') ||
+      lower.includes('moderation') ||
+      lower.includes('toxicity') ||
+      lower.includes('toxic') ||
+      lower.includes('inappropriate') ||
+      lower.includes('profanity') ||
+      lower.includes('hate speech') ||
+      lower.includes('rejected by ai')
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -141,11 +149,13 @@ const PostForm = ({ onPostCreated }) => {
       if (onPostCreated) onPostCreated(createdPost);
     } catch (err) {
       const apiErr =
+        err.response?.data?.image?.[0] ||
         err.response?.data?.description?.[0] ||
         err.response?.data?.non_field_errors?.[0] ||
         err.response?.data?.error ||
+        err.response?.data?.detail ||
         'Failed to publish post.';
-      setError(formatErrorMessage(apiErr));
+      setError(apiErr);
     } finally {
       setLoading(false);
     }
@@ -200,8 +210,19 @@ const PostForm = ({ onPostCreated }) => {
           )}
 
           {error && (
-            <div className="ai-moderation-alert">
-              🛡️ <strong>AI Moderation Flag:</strong> {error}
+            <div className={isAiModerationError(error) ? 'ai-moderation-alert' : 'form-validation-alert'}>
+              {isAiModerationError(error) ? (
+                <>
+                  🛡️ <strong>AI Moderation Flag:</strong>{' '}
+                  {error
+                    .replace(/^Post rejected by AI Moderation:\s*/i, '')
+                    .replace(/^AI Moderation Flagged:\s*/i, '')}
+                </>
+              ) : (
+                <>
+                  ⚠️ {error}
+                </>
+              )}
             </div>
           )}
 

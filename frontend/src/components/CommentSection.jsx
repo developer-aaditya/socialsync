@@ -8,6 +8,21 @@ import MentionDropdown from './MentionDropdown';
 import PublicProfileModal from './PublicProfileModal';
 import '../styles/comments.css';
 
+const isAiModerationError = (msg) => {
+  if (!msg || typeof msg !== 'string') return false;
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('ai moderation') ||
+    lower.includes('moderation') ||
+    lower.includes('toxicity') ||
+    lower.includes('toxic') ||
+    lower.includes('inappropriate') ||
+    lower.includes('profanity') ||
+    lower.includes('hate speech') ||
+    lower.includes('rejected by ai')
+  );
+};
+
 const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOwnerEmail, onNavigateToProfile }) => {
   const { user } = useAuth();
   const [showReplyForm, setShowReplyForm] = useState(false);
@@ -209,7 +224,11 @@ const CommentItem = ({ comment, postId, onCommentAdded, onCommentDeleted, postOw
             <FormattedText text={comment.text} onNavigateToProfile={onNavigateToProfile} />
           </p>
 
-          {error && <div className="ai-moderation-alert">🤖 {error}</div>}
+          {error && (
+            <div className={isAiModerationError(error) ? "ai-moderation-alert" : "form-validation-alert"}>
+              {isAiModerationError(error) ? `🛡️ AI Moderation Flag: ${error}` : `⚠️ ${error}`}
+            </div>
+          )}
 
           <div className="comment-actions">
             <button className={`comment-btn ${userInteraction === 'like' ? 'active-like' : ''}`} onClick={handleLike}>
@@ -425,8 +444,19 @@ const CommentSection = ({ postId, postOwnerEmail, onNavigateToProfile }) => {
       </form>
 
       {error && (
-        <div className="ai-moderation-alert main-alert">
-          🛡️ <strong>AI Moderation Flag:</strong> {error}
+        <div className={isAiModerationError(error) ? "ai-moderation-alert main-alert" : "form-validation-alert main-alert"}>
+          {isAiModerationError(error) ? (
+            <>
+              🛡️ <strong>AI Moderation Flag:</strong>{' '}
+              {error
+                .replace(/^Comment rejected by AI Moderation:\s*/i, '')
+                .replace(/^AI Moderation Flagged:\s*/i, '')}
+            </>
+          ) : (
+            <>
+              ⚠️ {error}
+            </>
+          )}
         </div>
       )}
 

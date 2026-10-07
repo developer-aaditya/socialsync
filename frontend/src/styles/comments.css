@@ -67,8 +67,21 @@
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 13.5px;
-  margin-top: 16px;
-  margin-bottom: 16px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.form-validation-alert {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  margin-top: 14px;
+  margin-bottom: 14px;
   line-height: 1.5;
   word-break: break-word;
 }
