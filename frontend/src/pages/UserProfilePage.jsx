@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/profile.css';
 import userApi from '../api/userApi';
 import { useAuth } from '../hooks/useAuth';
@@ -8,7 +9,11 @@ import FollowListModal from '../components/FollowListModal';
 import InstagramPostGrid from '../components/InstagramPostGrid';
 import PostCard from '../components/PostCard';
 
-const UserProfilePage = ({ username, onNavigateToProfile, onNavigateBack }) => {
+const UserProfilePage = ({ username: propUsername, onNavigateToProfile, onNavigateBack }) => {
+  const { username: paramUsername } = useParams();
+  const navigate = useNavigate();
+  const targetUsername = propUsername || paramUsername;
+
   const { user: currentUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -19,12 +24,54 @@ const UserProfilePage = ({ username, onNavigateToProfile, onNavigateBack }) => {
   const [activeCommentPostId, setActiveCommentPostId] = useState(null);
 
   const [followModalType, setFollowModalType] = useState(null); // 'followers' | 'following' | null
+  const [copiedProfile, setCopiedProfile] = useState(false);
+
+  const handleShareProfile = () => {
+    const shareUrl = `${window.location.origin}/profile/${profileData?.username || targetUsername}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopiedProfile(true);
+        setTimeout(() => setCopiedProfile(false), 2000);
+      }).catch(() => {
+        fallbackCopyProfile(shareUrl);
+      });
+    } else {
+      fallbackCopyProfile(shareUrl);
+    }
+  };
+
+  const fallbackCopyProfile = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    setCopiedProfile(true);
+    setTimeout(() => setCopiedProfile(false), 2000);
+  };
+
+  const handleProfileNavigation = (uname) => {
+    if (onNavigateToProfile) {
+      onNavigateToProfile(uname);
+    } else {
+      navigate(`/profile/${uname}`);
+    }
+  };
+
+  const handleBackNavigation = () => {
+    if (onNavigateBack) {
+      onNavigateBack();
+    } else {
+      navigate('/');
+    }
+  };
 
   useEffect(() => {
-    if (username) {
-      fetchUserProfile(username);
+    if (targetUsername) {
+      fetchUserProfile(targetUsername);
     }
-  }, [username]);
+  }, [targetUsername]);
 
   const fetchUserProfile = async (uname) => {
     try {
@@ -159,6 +206,13 @@ const UserProfilePage = ({ username, onNavigateToProfile, onNavigateBack }) => {
               ) : (
                 <span className="own-profile-badge">Your Profile</span>
               )}
+              <button
+                className="btn-follow is-following"
+                onClick={handleShareProfile}
+                title="Share Profile Link"
+              >
+                🔗 {copiedProfile ? 'Copied! 📋' : 'Share Profile'}
+              </button>
             </div>
 
             {/* Middle Row: Instagram Stats Alignment */}

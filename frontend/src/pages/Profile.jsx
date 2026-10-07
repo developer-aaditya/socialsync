@@ -20,6 +20,32 @@ const Profile = ({ onNavigateToProfile }) => {
 
   const [stats, setStats] = useState({ followers_count: 0, following_count: 0 });
   const [followModalType, setFollowModalType] = useState(null);
+  const [copiedProfile, setCopiedProfile] = useState(false);
+
+  const handleShareProfile = () => {
+    const shareUrl = `${window.location.origin}/profile/${user?.username}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopiedProfile(true);
+        setTimeout(() => setCopiedProfile(false), 2000);
+      }).catch(() => {
+        fallbackCopyProfile(shareUrl);
+      });
+    } else {
+      fallbackCopyProfile(shareUrl);
+    }
+  };
+
+  const fallbackCopyProfile = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    setCopiedProfile(true);
+    setTimeout(() => setCopiedProfile(false), 2000);
+  };
 
   // Fetch logged-in user profile details & user posts
   useEffect(() => {
@@ -96,7 +122,7 @@ const Profile = ({ onNavigateToProfile }) => {
 
           {/* Details Column */}
           <div className="insta-details-col">
-            {/* Top Row: Username & Edit Button */}
+            {/* Top Row: Username & Edit/Share Buttons */}
             <div className="insta-top-row">
               <h2 className="insta-username-handle">@{user?.username}</h2>
               <button
@@ -104,6 +130,13 @@ const Profile = ({ onNavigateToProfile }) => {
                 onClick={() => setIsEditModalOpen(true)}
               >
                 ✏️ Edit Profile
+              </button>
+              <button
+                className="btn-follow is-following"
+                onClick={handleShareProfile}
+                title="Share Profile Link"
+              >
+                🔗 {copiedProfile ? 'Copied! 📋' : 'Share Profile'}
               </button>
             </div>
 

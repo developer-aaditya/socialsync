@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../styles/navbar.css';
 import { useAuth } from '../hooks/useAuth';
 import { tokenService } from '../utils/tokenService';
@@ -9,6 +10,8 @@ import UserSearchBar from './UserSearchBar';
 import getMediaUrl from '../utils/mediaUrl';
 
 const Navbar = ({ currentPage, setCurrentPage, onNavigateToProfile, onOpenPost }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user, dispatch } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -18,6 +21,11 @@ const Navbar = ({ currentPage, setCurrentPage, onNavigateToProfile, onOpenPost }
   const [currentTheme, setCurrentTheme] = useState(themeService.getStoredTheme());
 
   const settingsRef = useRef(null);
+
+  const isHomeActive = location.pathname === '/';
+  const isProfileActive =
+    location.pathname === '/profile' ||
+    (user?.username && location.pathname.toLowerCase() === `/${user.username.toLowerCase()}`);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -80,13 +88,30 @@ const Navbar = ({ currentPage, setCurrentPage, onNavigateToProfile, onOpenPost }
   const confirmLogout = () => {
     tokenService.clearTokens();
     dispatch({ type: 'LOGOUT' });
-    setCurrentPage('login');
+    if (setCurrentPage) setCurrentPage('login');
+    navigate('/login');
     setShowLogoutConfirm(false);
   };
 
   const handleSelectUser = (username) => {
     if (onNavigateToProfile) {
       onNavigateToProfile(username);
+    } else {
+      navigate(`/${username}`);
+    }
+  };
+
+  const handleHomeClick = () => {
+    if (setCurrentPage) setCurrentPage('posts');
+    navigate('/');
+  };
+
+  const handleProfileClick = () => {
+    if (user?.username) {
+      if (setCurrentPage) setCurrentPage('profile');
+      navigate(`/${user.username}`);
+    } else {
+      navigate('/profile');
     }
   };
 
@@ -97,7 +122,7 @@ const Navbar = ({ currentPage, setCurrentPage, onNavigateToProfile, onOpenPost }
       <nav className="glass-navbar">
         <div className="navbar-container">
           {/* Brand Logo */}
-          <div className="navbar-brand" onClick={() => setCurrentPage('posts')}>
+          <div className="navbar-brand" onClick={handleHomeClick}>
             <svg
               className="brand-svg-logo"
               viewBox="0 0 24 24"
@@ -118,13 +143,13 @@ const Navbar = ({ currentPage, setCurrentPage, onNavigateToProfile, onOpenPost }
           <div className="navbar-actions">
             {/* Redesigned Home Navigation Button */}
             <button
-              className={`nav-home-btn ${currentPage === 'posts' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('posts')}
+              className={`nav-home-btn ${isHomeActive ? 'active' : ''}`}
+              onClick={handleHomeClick}
               title="Home Feed"
             >
               <div className="home-icon-box">
                 <svg
-                  className={`nav-icon-svg home-svg ${currentPage === 'posts' ? 'active-icon' : ''}`}
+                  className={`nav-icon-svg home-svg ${isHomeActive ? 'active-icon' : ''}`}
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -164,8 +189,8 @@ const Navbar = ({ currentPage, setCurrentPage, onNavigateToProfile, onOpenPost }
 
             {/* Profile Chip */}
             <div
-              className={`user-profile-chip ${currentPage === 'profile' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('profile')}
+              className={`user-profile-chip ${isProfileActive ? 'active' : ''}`}
+              onClick={handleProfileClick}
               title="View Profile"
             >
               <div className="user-avatar-small">

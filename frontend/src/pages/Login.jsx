@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import '../styles/auth.css';
 import authApi from '../api/authApi';
 import { tokenService } from '../utils/tokenService';
@@ -6,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import themeService from '../utils/themeService';
 
 const Login = ({ setCurrentPage }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,7 +55,8 @@ const Login = ({ setCurrentPage }) => {
         payload: profileData.user || profileData,
       });
 
-      setCurrentPage('posts');
+      if (setCurrentPage) setCurrentPage('posts');
+      navigate('/');
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -119,14 +122,9 @@ const Login = ({ setCurrentPage }) => {
 
         <p className="auth-switch">
           Don't have an account?{' '}
-          <button
-            type="button"
-            className="switch-button"
-            onClick={() => setCurrentPage('signup')}
-            disabled={loading}
-          >
+          <Link to="/signup" className="switch-button">
             Create account
-          </button>
+          </Link>
         </p>
       </div>
     </div>

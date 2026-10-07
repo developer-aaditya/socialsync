@@ -108,6 +108,34 @@ const PostCard = ({
     }
   };
 
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  const handleSharePost = (e) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/post/${post.id}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopiedShare(true);
+        setTimeout(() => setCopiedShare(false), 2000);
+      }).catch(() => {
+        fallbackCopy(shareUrl);
+      });
+    } else {
+      fallbackCopy(shareUrl);
+    }
+  };
+
+  const fallbackCopy = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 2000);
+  };
+
   return (
     <>
       <div className="modern-post-card">
@@ -194,6 +222,15 @@ const PostCard = ({
             >
               <svg className={`action-icon-svg dislike-svg ${isDisliked ? 'disliked' : ''}`} viewBox="0 0 24 24" fill={isDisliked ? "#f59e0b" : "none"} stroke={isDisliked ? "#f59e0b" : "currentColor"} strokeWidth="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
               <span className="count-label">{dislikesCount}</span>
+            </button>
+
+            <button
+              className="btn-action-pill"
+              onClick={handleSharePost}
+              title="Share Post Link"
+            >
+              <svg className="action-icon-svg share-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              <span className="count-label">{copiedShare ? 'Copied! 📋' : 'Share'}</span>
             </button>
           </div>
 

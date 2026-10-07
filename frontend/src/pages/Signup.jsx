@@ -2,12 +2,14 @@ import "../styles/auth.css";
 import authApi from "../api/authApi";
 import userApi from "../api/userApi";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { tokenService } from "../utils/tokenService";
 import { useAuth } from "../hooks/useAuth";
 import themeService from "../utils/themeService";
 import ImageCropperModal from "../components/ImageCropperModal";
 
 const Signup = ({ setCurrentPage }) => {
+  const navigate = useNavigate();
   // Step 1: Account details (Mandatory)
   const [step, setStep] = useState(1); // 1 = Mandatory details, 2 = Optional Profile info
 
@@ -220,7 +222,8 @@ const Signup = ({ setCurrentPage }) => {
         payload: profileData.user || profileData,
       });
 
-      setCurrentPage("posts");
+      if (setCurrentPage) setCurrentPage("posts");
+      navigate("/");
     } catch (err) {
       console.error("Signup error:", err);
       setError(
@@ -455,14 +458,9 @@ const Signup = ({ setCurrentPage }) => {
 
         <p className="auth-switch">
           Already have an account?{" "}
-          <button
-            type="button"
-            className="switch-button"
-            onClick={() => setCurrentPage("login")}
-            disabled={loading}
-          >
+          <Link to="/login" className="switch-button">
             Sign in
-          </button>
+          </Link>
         </p>
       </div>
 
