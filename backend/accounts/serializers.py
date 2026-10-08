@@ -61,6 +61,16 @@ class UserSignupSerializer(serializers.ModelSerializer):
             if age < 18:
                 raise serializers.ValidationError("You must be at least 18 years old to register.")
         return value
+
+    def validate_profile_picture(self, value):
+        if value and not isinstance(value, str):
+            if hasattr(value, 'size') and value.size > 10 * 1024 * 1024:
+                raise serializers.ValidationError("Image file too large. Maximum size is 10MB.")
+            if hasattr(value, 'content_type'):
+                allowed_types = ['image/jpeg', 'image/jpg', 'image/png']
+                if value.content_type not in allowed_types:
+                    raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
+        return value
     
     # Create user with validated data
     def create(self, validated_data):
@@ -177,8 +187,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate_profile_picture(self, value):
         if value and not isinstance(value, str):
-            if hasattr(value, 'size') and value.size > 5 * 1024 * 1024:
-                raise serializers.ValidationError("Image file too large. Maximum size is 5MB.")
+            if hasattr(value, 'size') and value.size > 10 * 1024 * 1024:
+                raise serializers.ValidationError("Image file too large. Maximum size is 10MB.")
             if hasattr(value, 'content_type'):
                 allowed_types = ['image/jpeg', 'image/jpg', 'image/png']
                 if value.content_type not in allowed_types:

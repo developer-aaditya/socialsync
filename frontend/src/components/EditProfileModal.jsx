@@ -44,8 +44,8 @@ const EditProfileModal = ({ isOpen, onClose, onProfileUpdated }) => {
         setError('Please select a valid image file (JPG or PNG)');
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Image file must be smaller than 5MB');
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Image file must be smaller than 10MB');
         return;
       }
       setError(null);
