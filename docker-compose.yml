@@ -1,0 +1,116 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:16-alpine
+    container_name: socialsync_db
+    restart: always
+    environment:
+      POSTGRES_DB: socialsync_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - socialsync_network
+
+  # Redis Service (Broker and Cache)
+  redis:
+    image: redis:7-alpine
+    container_name: socialsync_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - socialsync_network
+
+  # Django Daphne ASGI Web Service
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: socialsync_web
+    restart: always
+    command: daphne -b 0.0.0.0 -p 8000 socialsync.asgi:application
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICE_TYPE: web
+      DATABASE: postgres
+      SQL_ENGINE: django.db.backends.postgresql
+      SQL_DATABASE: socialsync_db
+      SQL_USER: postgres
+      SQL_PASSWORD: postgres
+      SQL_HOST: db
+      SQL_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/1
+    volumes:
+      - ./backend:/app
+      - media_volume:/app/media
+    depends_on:
+      - db
+      - redis
+    networks:
+      - socialsync_network
+
+  # Celery Worker Service
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: socialsync_celery
+    restart: always
+    command: celery -A socialsync worker --loglevel=info
+    environment:
+      SERVICE_TYPE: worker
+      DATABASE: postgres
+      SQL_ENGINE: django.db.backends.postgresql
+      SQL_DATABASE: socialsync_db
+      SQL_USER: postgres
+      SQL_PASSWORD: postgres
+      SQL_HOST: db
+      SQL_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/1
+    volumes:
+      - ./backend:/app
+      - media_volume:/app/media
+    depends_on:
+      - db
+      - redis
+    networks:
+      - socialsync_network
+
+  # React Vite Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: socialsync_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - web
+    networks:
+      - socialsync_network
+
+# Persistent Volumes for Database, Redis, and Media Files
+volumes:
+  postgres_data:
+  redis_data:
+  media_volume:
+
+# Custom Network for Inter-Service Communication (Isolated)
+networks:
+  socialsync_network:
+    driver: bridge

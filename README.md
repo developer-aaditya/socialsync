@@ -13,7 +13,7 @@ socialsync/
 │   ├── accounts/             # User management, authentication, follow system
 │   ├── posts/                # Posts, comments, likes, and feed generation
 │   ├── notifications/        # User activity notifications
-│   ├── social_media/         # Django project settings and routing configuration
+│   ├── socialsync/           # Django project settings and routing configuration
 │   ├── media/                # User uploaded media (avatars, post images)
 │   ├── manage.py             # Django management CLI
 │   └── requirements.txt      # Python dependencies
