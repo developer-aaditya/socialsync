@@ -1,4 +1,4 @@
-# Django Social Media API - Beginner Tutorial
+# Django SocialSync API - Beginner Tutorial
 
 ## What We're Building
 A simple social media backend API where users can:
@@ -37,14 +37,14 @@ pip install python-decouple
 
 ### Create Django Project
 ```bash
-django-admin startproject social_media_api .
-cd social_media_api
+django-admin startproject socialsync .
+cd socialsync
 python manage.py startapp accounts
 python manage.py startapp posts
 ```
 
 ### PostgreSQL Setup
 1. Install PostgreSQL on your computer
-2. Create a database named 'social_media_db'
+2. Create a database named 'socialsync_db'
 3. Create a user with password
 4. Update settings.py with database credentials

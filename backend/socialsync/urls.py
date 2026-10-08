@@ -1,5 +1,5 @@
 """
-Main URL configuration for social_media_api project.
+Main URL configuration for socialsync project.
 This file routes URLs to the appropriate app URLs.
 """
 

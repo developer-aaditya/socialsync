@@ -83,7 +83,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Use email for authentication instead of username
     USERNAME_FIELD = 'email'
     # Fields required when creating superuser
-    REQUIRED_FIELDS = ['username', 'full_name']
+    REQUIRED_FIELDS = ['username', 'full_name', 'date_of_birth']
     
     class Meta:
         verbose_name = 'User'

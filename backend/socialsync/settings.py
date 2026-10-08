@@ -1,5 +1,5 @@
 """
-Django settings for social_media_api project.
+Django settings for socialsync project.
 This file contains all the configuration for our Django project.
 """
 
@@ -23,10 +23,7 @@ HF_API_TOKEN = os.getenv('HF_API_TOKEN', None)
 # Don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    '127.0.0.1',
-    'localhost',
-]
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,web,0.0.0.0').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -61,7 +58,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'social_media.urls'
+ROOT_URLCONF = 'socialsync.urls'
 
 TEMPLATES = [
     {
@@ -80,33 +77,41 @@ TEMPLATES = [
 ]
 
 # ASGI application for Django Channels (WebSocket support)
-ASGI_APPLICATION = 'social_media.asgi.application'
+ASGI_APPLICATION = 'socialsync.asgi.application'
 
 # # Channels layer configuration using Redis as the backing store
 # CHANNEL_LAYERS = {
 #     'default': {
 #         'BACKEND': 'channels_redis.core.RedisChannelLayer',
 #         'CONFIG': {
-#             "hosts": [("127.0.0.1", 6379)]
-#         }
-#     }
-# }
-# For development, we can use the in-memory channel layer instead of Redis.
+# Channels layer configuration
+REDIS_BROKER = os.getenv('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',  # Use in-memory layer for development
-    },
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.getenv('REDIS_CHANNEL_URL', REDIS_BROKER)],
+        },
+    } if os.getenv('CELERY_BROKER_URL') else {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
 }
 
-# PostgreSQL configuration (uncomment to use PostgreSQL)
+# PostgreSQL DB configuration
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'social_media_db',
-        'USER': 'postgres',
-        'PASSWORD': 'aadi123',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        # 'ENGINE': 'django.db.backends.postgresql',
+        # 'NAME': 'socialsync_db',
+        # 'USER': 'postgres',
+        # 'PASSWORD': 'aadi123',
+        # 'HOST': 'localhost',
+        # 'PORT': '5432',
+        'ENGINE': os.getenv('SQL_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': os.getenv('SQL_DATABASE', 'socialsync_db'),
+        'USER': os.getenv('SQL_USER', 'postgres'),
+        'PASSWORD': os.getenv('SQL_PASSWORD', 'postgres'),
+        'HOST': os.getenv('SQL_HOST', 'localhost'),
+        'PORT': os.getenv('SQL_PORT', '5432'),
     }
 }
 
@@ -189,9 +194,8 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # CELERY and Redis configuration
-CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Redis as the message broker
-
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # Redis as the result backend
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')  # Redis as the message broker
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)  # Redis as the result backend
 
 # Accept JSON payloads format for tasks data security
 CELERY_ACCEPT_CONTENT = ['json']
@@ -206,7 +210,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
+        "LOCATION": os.getenv('REDIS_CACHE_URL', 'redis://127.0.0.1:6379/1'),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }

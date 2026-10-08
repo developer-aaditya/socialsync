@@ -1,0 +1,66 @@
+# ==========================================
+# Python & Django Backend Ignores
+# ==========================================
+
+# Virtual Environments
+env/
+venv/
+.venv/
+backend/env/
+backend/venv/
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Test Scripts & Results
+**/tests.py
+**/test_*.py
+**/tests/
+
+# Environment Variables & Secrets
+.env
+*.env
+backend/.env
+
+# SQLite Database & Uploaded Media Files
+*.sqlite3
+backend/db.sqlite3
+media/
+backend/media/
+
+
+# ==========================================
+# Node.js & React Frontend Ignores
+# ==========================================
+
+# Node Dependencies
+node_modules/
+frontend/node_modules/
+
+# Production Build Directories
+dist/
+frontend/dist/
+build/
+frontend/build/
+
+# Logs & Debug Output
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+
+# ==========================================
+# Editor & Operating System Files
+# ==========================================
+
+# IDE Directories
+.vscode/
+.idea/
+
+# OS Generated Files
+.DS_Store
+Thumbs.db

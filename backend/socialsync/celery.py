@@ -2,10 +2,10 @@ import os
 from celery import Celery
 
 # Set the default Django settings module for the 'celery' program.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'social_media.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'socialsync.settings')
 
-# Instantiate a Celery application named social_media and configure it to use the settings from the Django project.
-app = Celery('social_media')
+# Instantiate a Celery application named socialsync and configure it to use the settings from the Django project.
+app = Celery('socialsync')
 
 # Read configuration from Django settings, using a namespace of 'CELERY' to avoid conflicts with other settings.
 # This allows Celery to pick up any relevant configuration options defined in the Django settings file.
