@@ -145,8 +145,19 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose, lockAspectRatio 
   const target = getTargetDimensions();
 
   return (
-    <div className="crop-modal-overlay">
-      <div className="crop-modal-card" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+    <div
+      className="crop-modal-overlay"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="crop-modal-card"
+        onClick={(e) => e.stopPropagation()}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         <div className="crop-header">
           <h3>✂️ Crop Profile Picture (1:1 Box)</h3>
           <button className="crop-close-btn" onClick={onClose}>×</button>
@@ -160,9 +171,10 @@ const ImageCropperModal = ({ imageUrl, onCropComplete, onClose, lockAspectRatio 
               <canvas
                 ref={previewCanvasRef}
                 className="crop-canvas"
-                style={{ width: '100%', height: '100%', cursor: 'grab' }}
+                style={{ width: '100%', height: '100%', cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
               />
             </div>
           )}
